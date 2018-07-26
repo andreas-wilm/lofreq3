@@ -35,17 +35,17 @@ proc log_sum(log_a: float32, log_b: float32): float32 =
   else:
     log_b + ln(1.0 + exp(log_a-log_b))# FIXME use c log1p?
 
-
+# FIXME add doc and refer to paper
 # FIXME: does it make sense to receive phred scores here instead?
 # less conversion and no need to check range then?
-proc pruned_prob_dist(err_probs: seq[float],# FIXME use ref to safe mem?
+proc pruned_prob_dist(err_probs: openArray[float],# FIXME use ref to safe mem?
                       K: Natural,
                       bonf = 1.0, sig = 1.0): seq[float] =
   assert K > 0
   let N = err_probs.len
   var probvec = newSeq[float64](K+1)
   var probvec_prev = newSeq[float64](K+1)
-
+    
   for f in err_probs:
     assert f>=0.0 and f<=1.0
   probvec_prev[0] = 0.0; # log(1.0)
@@ -96,7 +96,7 @@ proc pruned_prob_dist(err_probs: seq[float],# FIXME use ref to safe mem?
 
       let pvalue = exp(probvec[K]);
           
-      # FIXME store as phred scores instead?:
+      # FIXME store as phred scores instead?: FIXME FIXME does this belong here?
       # Q = -10*log_10(e^X), where X=probvec[K]
       # remember, log_b(x) = log_k(x)/log_k(b), i.e. log_10(Y) = log_e(Y)/log_e(10)
       # therefore, Q = -10 * log_e(e^X)/log_e(10) = -10 * X/log_e(10)
@@ -108,12 +108,14 @@ proc pruned_prob_dist(err_probs: seq[float],# FIXME use ref to safe mem?
       # >>> -10 * X/log(10)
       # 434.2944819032518
       # */
+      # early exit
       if pvalue * bonf > sig:
-        return probvec# or nothing?
+        # explicitly limiting to valid range
+        return probvec[0..K]
     swap(probvec, probvec_prev)
 
   # return prev because we just swapped (if not pruned)
-  return probvec_prev
+  return probvec_prev[0..K] # explicitly limiting to valid range
 
 
     
@@ -171,15 +173,26 @@ proc main(plp_fname: string) =
   var plpTable = parse_plp_json(plp_fname)
   echo(plpTable)
 
-  if false:
-    var eprobs = @[0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+  
+  # FIXME tst more agaisnt
+  # $ R
+  # > library(poibin)
+  # > p = read.table('scratch/errprobs')
+  # > pp = c(p)$V1
+  # > nerrs = 5# as above
+  # > ppoibin(kk=length(pp)-nerrs, pp=1-pp)
+  # 0.000262769
+
+  if true:
+    var eprobs = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
     let num_failures = 1
     # produces 0.00995512 just like ppoibin
     let probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
     let pvalue = exp(probvec[num_failures]);
     echo("num_failures=" & $num_failures & " pvalue=" & $pvalue)
   else:
-    var eprobs = @[0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+    # pseudo random values
+    var eprobs = [0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
     for num_failures in countup(1, 10):
       let probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
       let pvalue = exp(probvec[num_failures]);
