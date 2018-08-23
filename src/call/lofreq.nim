@@ -72,7 +72,7 @@ proc pruned_prob_dist(err_probs: openArray[float],# FIXME use ref to safe mem?
       probvec_prev[n] = -float(high(int))
       
     for k in countdown(min(n, K-1), 1):
-      try:
+      try:# FIXME why try?
         assert probvec_prev[k]<=0.0 and probvec_prev[k-1]<=0.0
       except AssertionError:
         raise
@@ -88,7 +88,7 @@ proc pruned_prob_dist(err_probs: openArray[float],# FIXME use ref to safe mem?
       # FIXME prune here as well?
        
     elif n > K:
-      try:
+      try:# FIXME why try?
         assert probvec_prev[K] <= 0.0 and probvec_prev[K-1] <= 0.0 # FIXME
       except AssertionError:
         raise
@@ -149,6 +149,7 @@ proc parse_plp_json(fname: string): Table[string, Table[int, int]]  =
     
   
 proc main(plp_fname: string) =
+  var run_tests = true
   #var plpTable: Table[char, Table[int]]
   #for base in "ACGTN":
   #  plpTable[base] = initTable[int]()
@@ -173,31 +174,36 @@ proc main(plp_fname: string) =
   var plpTable = parse_plp_json(plp_fname)
   echo(plpTable)
 
-  
-  # FIXME tst more agaisnt
-  # $ R
-  # > library(poibin)
-  # > p = read.table('scratch/errprobs')
-  # > pp = c(p)$V1
-  # > nerrs = 5# as above
-  # > ppoibin(kk=length(pp)-nerrs, pp=1-pp)
-  # 0.000262769
-
-  if true:
+  if run_tests:
+    # eprobs_10x30.txt
+    var pvalue: float
+    var probvec: seq[float]
+    var num_failures: int
+    
     var eprobs = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
-    let num_failures = 1
-    # produces 0.00995512 just like ppoibin
-    let probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
-    let pvalue = exp(probvec[num_failures]);
-    echo("num_failures=" & $num_failures & " pvalue=" & $pvalue)
-  else:
+    
+    num_failures = 1
+    probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
+    pvalue = exp(probvec[num_failures]);
+    echo("DEBUG num_failures=" & $num_failures & " pvalue=" & $pvalue)
+    assert abs(pvalue - 0.00995512) < 1e-6
+
+    num_failures = 2
+    probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
+    pvalue = exp(probvec[num_failures]);
+    echo("DEBUG num_failures=" & $num_failures & " pvalue=" & $pvalue)
+    assert abs(pvalue - 4.476063e-05) < 1e-6
+    
+  elif false:
     # pseudo random values
     var eprobs = [0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
     for num_failures in countup(1, 10):
       let probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
       let pvalue = exp(probvec[num_failures]);
       echo("num_failures=" & $num_failures & " pvalue=" & $pvalue)
-       
+
+  # FIXME read from tests/eprobs*
+      
 when isMainModule:
   import cligen
   dispatch(main)
