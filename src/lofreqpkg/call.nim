@@ -3,7 +3,7 @@
 ## - Author: Andreas Wilm <wilma@gis.a-star.edu.sg>
 ## - License: The MIT License
 
-
+# FIXME to doc
 # read level filtering can only happen at the pileup stage.  so it
 # makes sense to apply base level filtering there as well. in other
 # words, here we only deal with filtered data. the data exchanged
@@ -17,13 +17,11 @@
 # (coverage etc.)
 
 import tables
-import cligen
 import json
 import parseutils
 import math
 import strutils
 import times
-import unittest
 
 
 ##
@@ -41,7 +39,8 @@ proc log_sum(log_a: float32, log_b: float32): float32 =
 # FIXME add doc and refer to paper
 # FIXME: does it make sense to receive phred scores here instead?
 # less conversion and no need to check range then?
-proc pruned_prob_dist(err_probs: openArray[float],# FIXME use ref to safe mem?
+# FIXME no need to make public except for tests
+proc pruned_prob_dist*(err_probs: openArray[float],# FIXME use ref to safe mem?
                       K: Natural,
                       bonf = 1.0, sig = 1.0): seq[float] =
   assert K > 0
@@ -99,7 +98,7 @@ proc pruned_prob_dist(err_probs: openArray[float],# FIXME use ref to safe mem?
 
       let pvalue = exp(probvec[K]);
           
-      # FIXME store as phred scores instead?: FIXME FIXME does this belong here?
+      # FIXME store as phred scores instead?
       # Q = -10*log_10(e^X), where X=probvec[K]
       # remember, log_b(x) = log_k(x)/log_k(b), i.e. log_10(Y) = log_e(Y)/log_e(10)
       # therefore, Q = -10 * log_e(e^X)/log_e(10) = -10 * X/log_e(10)
@@ -110,7 +109,7 @@ proc pruned_prob_dist(err_probs: openArray[float],# FIXME use ref to safe mem?
       # 434.29448190325184
       # >>> -10 * X/log(10)
       # 434.2944819032518
-      # */
+          
       # early exit
       if pvalue * bonf > sig:
         # explicitly limiting to valid range
@@ -121,7 +120,6 @@ proc pruned_prob_dist(err_probs: openArray[float],# FIXME use ref to safe mem?
   return probvec_prev[0..K] # explicitly limiting to valid range
 
     
-#Proc parse_plp_json(data: string) =
 proc parse_plp_json(fname: string): Table[string, Table[int, int]]  =
   result = initTable[string, Table[int, int]]()
   
@@ -150,32 +148,14 @@ proc parse_plp_json(fname: string): Table[string, Table[int, int]]  =
       result[event][q] = c
 
       
-proc prob2qual(e: float): Natural =
+proc prob2qual*(e: float): Natural =
   # FIXME handle 0.0 with caught exception?
   assert e>=0.0
   return Natural(-10.0 * log10(e))
 
 
-proc qual2prob(q: Natural): float =
+proc qual2prob*(q: Natural): float =
   return pow(10.0, float(-q)/10.0)
-
-
-suite "qual and prob conversion":
-  setup:
-     echo "suite setup: run before each test"
-
-  teardown:
-    echo "suite teardown: run after each test"
-
-  test "prob2qual":
-    check prob2qual(0.05) == 13
-    check prob2qual(0.01) == 20
-    check prob2qual(0.001) == 30
-
-  test "qual2prob":
-    check abs(qual2prob(13) - 0.05) < 0.005
-    check abs(qual2prob(20) - 0.01) < 0.001
-    check abs(qual2prob(30) - 0.001) < 0.0001
 
     
 proc datestr(): string = 
@@ -198,8 +178,7 @@ proc write_vcf_header(src="FIXME:src", reffa="FIXME:ref") =
   echo hdr
 
     
-proc main(plp_fname: string) =
-  var run_tests = true
+proc call_cmd*(plp_fname: string) =
   #var plpTable: Table[char, Table[int]]
   #for base in "ACGTN":
   #  plpTable[base] = initTable[int]()
@@ -224,39 +203,7 @@ proc main(plp_fname: string) =
   # plpTable =
   var plpTable = parse_plp_json(plp_fname)
   echo(plpTable)
-
-  if run_tests:
-    # eprobs_10x30.txt
-    var pvalue: float
-    var probvec: seq[float]
-    var num_failures: int
-    
-    var eprobs = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
-    
-    num_failures = 1
-    probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
-    pvalue = exp(probvec[num_failures]);
-    echo("DEBUG num_failures=" & $num_failures & " pvalue=" & $pvalue  & " prob2qual=" & $prob2qual(pvalue))
-    assert abs(pvalue - 0.00995512) < 1e-6
-
-    num_failures = 2
-    probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
-    pvalue = exp(probvec[num_failures]);
-    echo("DEBUG num_failures=" & $num_failures & " pvalue=" & $pvalue  & " prob2qual=" & $prob2qual(pvalue))
-    assert abs(pvalue - 4.476063e-05) < 1e-6
-    
-  elif false:
-    # pseudo random values
-    var eprobs = [0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.005, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
-    for num_failures in countup(1, 10):
-      let probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
-      let pvalue = exp(probvec[num_failures]);
-      echo("num_failures=" & $num_failures & " pvalue=" & $pvalue & " prob2qual=" & $prob2qual(pvalue))
-                 
-  # FIXME read from tests/eprobs*
       
 when isMainModule:
   import cligen
-  dispatch(main)
-
-
+  dispatch(call_cmd)

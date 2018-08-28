@@ -1,0 +1,3 @@
+with open("eprobs_10x30.txt", 'w') as fh:
+    for i in range(10):
+        fh.write("0.001\n")

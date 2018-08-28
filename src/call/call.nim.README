@@ -1,1 +1,0 @@
-nim c -r call.nim -p example.json
