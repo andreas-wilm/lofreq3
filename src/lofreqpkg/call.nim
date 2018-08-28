@@ -178,7 +178,7 @@ proc write_vcf_header(src="FIXME:src", reffa="FIXME:ref") =
   echo hdr
 
     
-proc call_cmd*(plp_fname: string) =
+proc call*(plp_fname: string) =
   #var plpTable: Table[char, Table[int]]
   #for base in "ACGTN":
   #  plpTable[base] = initTable[int]()
@@ -206,4 +206,4 @@ proc call_cmd*(plp_fname: string) =
       
 when isMainModule:
   import cligen
-  dispatch(call_cmd)
+  dispatch(call)
