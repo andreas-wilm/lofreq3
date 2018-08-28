@@ -21,6 +21,9 @@ import cligen
 import json
 import parseutils
 import math
+import strutils
+import times
+import unittest
 
 
 ##
@@ -28,13 +31,13 @@ import math
 ##
 ## Taken from util.h of FAST source code:
 ## http://www.cs.cornell.edu/~keich/FAST/fast.tar.gz
-
 proc log_sum(log_a: float32, log_b: float32): float32 =
   if log_a > log_b:
     log_a + ln(1.0 + exp(log_b-log_a))# FIXME use c log1p?
   else:
     log_b + ln(1.0 + exp(log_a-log_b))# FIXME use c log1p?
 
+    
 # FIXME add doc and refer to paper
 # FIXME: does it make sense to receive phred scores here instead?
 # less conversion and no need to check range then?
@@ -117,7 +120,6 @@ proc pruned_prob_dist(err_probs: openArray[float],# FIXME use ref to safe mem?
   # return prev because we just swapped (if not pruned)
   return probvec_prev[0..K] # explicitly limiting to valid range
 
-
     
 #Proc parse_plp_json(data: string) =
 proc parse_plp_json(fname: string): Table[string, Table[int, int]]  =
@@ -146,8 +148,56 @@ proc parse_plp_json(fname: string): Table[string, Table[int, int]]  =
         result[event] = initTable[int, int]()
       assert result[event].hasKey(q) == false
       result[event][q] = c
+
+      
+proc prob2qual(e: float): Natural =
+  # FIXME handle 0.0 with caught exception?
+  assert e>=0.0
+  return Natural(-10.0 * log10(e))
+
+
+proc qual2prob(q: Natural): float =
+  return pow(10.0, float(-q)/10.0)
+
+
+suite "qual and prob conversion":
+  setup:
+     echo "suite setup: run before each test"
+
+  teardown:
+    echo "suite teardown: run after each test"
+
+  test "prob2qual":
+    check prob2qual(0.05) == 13
+    check prob2qual(0.01) == 20
+    check prob2qual(0.001) == 30
+
+  test "qual2prob":
+    check abs(qual2prob(13) - 0.05) < 0.005
+    check abs(qual2prob(20) - 0.01) < 0.001
+    check abs(qual2prob(30) - 0.001) < 0.0001
+
     
-  
+proc datestr(): string = 
+  var t = getTime().local()
+  result = t.format("yyyyMMdd")
+
+
+# FIXME check conformity
+proc write_vcf_header(src="FIXME:src", reffa="FIXME:ref") =
+  var hdr = """##fileformat=VCFv4.2
+##fileDate=$1
+##source=$2
+##reference=$3
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Raw Depth">
+##INFO=<ID=AF,Number=1,Type=Float,Description="Allele Frequency">
+##INFO=<ID=SB,Number=1,Type=Integer,Description="Phred-scaled strand bias at this position">
+##INFO=<ID=DP4,Number=4,Type=Integer,Description="Counts for ref-forward bases, ref-reverse, alt-forward and alt-reverse bases">
+##INFO=<ID=INDEL,Number=0,Type=Flag,Description="Indicates that the variant is an INDEL.">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO""" % [datestr(), src, reffa]
+  echo hdr
+
+    
 proc main(plp_fname: string) =
   var run_tests = true
   #var plpTable: Table[char, Table[int]]
@@ -169,7 +219,8 @@ proc main(plp_fname: string) =
   #parse_plp_json($data)
   # when passed as string we get a JArray?!
   # when passed as file we get JObject?!
-
+  write_vcf_header()
+ 
   # plpTable =
   var plpTable = parse_plp_json(plp_fname)
   echo(plpTable)
@@ -185,13 +236,13 @@ proc main(plp_fname: string) =
     num_failures = 1
     probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
     pvalue = exp(probvec[num_failures]);
-    echo("DEBUG num_failures=" & $num_failures & " pvalue=" & $pvalue)
+    echo("DEBUG num_failures=" & $num_failures & " pvalue=" & $pvalue  & " prob2qual=" & $prob2qual(pvalue))
     assert abs(pvalue - 0.00995512) < 1e-6
 
     num_failures = 2
     probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
     pvalue = exp(probvec[num_failures]);
-    echo("DEBUG num_failures=" & $num_failures & " pvalue=" & $pvalue)
+    echo("DEBUG num_failures=" & $num_failures & " pvalue=" & $pvalue  & " prob2qual=" & $prob2qual(pvalue))
     assert abs(pvalue - 4.476063e-05) < 1e-6
     
   elif false:
@@ -200,8 +251,8 @@ proc main(plp_fname: string) =
     for num_failures in countup(1, 10):
       let probvec = pruned_prob_dist(eprobs, num_failures, bonf=1.0, sig=0.05)
       let pvalue = exp(probvec[num_failures]);
-      echo("num_failures=" & $num_failures & " pvalue=" & $pvalue)
-
+      echo("num_failures=" & $num_failures & " pvalue=" & $pvalue & " prob2qual=" & $prob2qual(pvalue))
+                 
   # FIXME read from tests/eprobs*
       
 when isMainModule:
