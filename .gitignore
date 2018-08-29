@@ -3,3 +3,4 @@ nimcache
 lofreq
 .Rhistory
 tests/all
+tmp/
