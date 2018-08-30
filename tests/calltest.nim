@@ -22,7 +22,19 @@ suite "qual and prob conversion":
     check abs(qual2prob(20) - 0.01) < 0.001
     check abs(qual2prob(30) - 0.001) < 0.0001
 
-suite "pvalue computation":    
+suite "pvalue computation":
+
+  # pvalues were computed with [poibin](https://cran.r-project.org/package=poibin), e.g.
+  # ```
+  # > library("poibin")
+  # > p = read.table('eprobs_10x30.txt')
+  # > pp = c(p)$V1
+  # nerrs = 1
+  # pv = ppoibin(kk=length(pp)-nerrs, pp=1-pp)
+  # pv
+  # [1] 0.00995512
+  # ```
+    
   setup:
     var pvalue: float
     var probvec: seq[float]

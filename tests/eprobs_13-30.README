@@ -1,6 +1,0 @@
-from math import log10
-with open("eprobs_13-30.txt", 'w') as fh:
-    for i in range(13, 31):
-        e = 10.0**(-i/10.0)
-        #print("%d %f" % (i, e))
-        fh.write("%f\n" % e)
