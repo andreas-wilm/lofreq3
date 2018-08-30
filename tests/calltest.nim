@@ -3,6 +3,8 @@ import math
 
 import ../src/lofreqpkg/call as call
 
+# FIXME can we somehow test the main function call.call?
+    
 suite "qual and prob conversion":
   #setup:
   #   echo "suite setup: run before each test"

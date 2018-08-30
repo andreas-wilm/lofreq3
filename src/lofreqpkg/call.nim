@@ -1,20 +1,7 @@
-## LoFreq
+## LoFreq: variant calling routines
 ##
 ## - Author: Andreas Wilm <wilma@gis.a-star.edu.sg>
 ## - License: The MIT License
-
-# FIXME to doc
-# read level filtering can only happen at the pileup stage.  so it
-# makes sense to apply base level filtering there as well. in other
-# words, here we only deal with filtered data. the data exchanged
-# between plp and call is basically a quality histogram per event
-# (base indel). the histogram allows a dense representation even for
-# ultra high coverage data. the downside is, we cannot keep multiple
-# qualities, because the linkage is broken in a histogram. so quality
-# joining has to happen in the plp phase as well. as little filtering
-# as possible should happen in the plp phase, because firstly LoFreq
-# is meant to deal with noise and secondly you otherwise skew results
-# (coverage etc.)
 
 import tables
 import json
@@ -23,6 +10,8 @@ import math
 import strutils
 import times
 
+
+## brief pileup object parsed from json
 type PlpObj = object
   sq: string
   pos: Natural
@@ -124,7 +113,8 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
   # return prev because we just swapped (if not pruned)
   return probVecPrev[0..K] # explicitly limiting to valid range
 
-    
+
+## brief parse pileup object from json
 proc parsePlpJson(fname: string): PlpObj =
   result.qHist = initTable[string, Table[int, int]]()
   
@@ -159,41 +149,47 @@ proc parsePlpJson(fname: string): PlpObj =
       result.qHist[event][q] = c
 
       
+## brief convert error probability to phred quality
 proc prob2qual*(e: float): Natural =
   # FIXME handle 0.0 with caught exception?
   assert e>=0.0
   return Natural(-10.0 * log10(e))
 
-
+## brief convert phred quality to error probability
 proc qual2prob*(q: Natural): float =
   return pow(10.0, float(-q)/10.0)
 
     
+## brief generate date string
 proc dateStr(): string = 
   var t = getTime().local()
   result = t.format("yyyyMMdd")
 
 
-# FIXME check conformity
-proc writeVcfHeader(src="FIXME:src", refFa="FIXME:refWhichWeOnlyKnowDuringPlp") =
-  var hdr = """##fileformat=VCFv4.2
-##fileDate=$1
-##source=$2
-##reference=$3
-##INFO=<ID=DP,Number=1,Type=Integer,Description="Raw Depth">
+## brief create vcf header
+# FIXME check conformity. refFa and src likely missing since only known in plp
+proc vcfHeader(src: string = "", refFa: string = ""): string =
+  result = "##fileformat=VCFv4.2\n"
+  result = result & "##fileDate=" & dateStr() & "\n"
+  if len(src)>0:
+    result = result & "##source=" & src & "\n"
+  if len(refFa)>0:
+    result = result & "##reference=" & refFa & "\n"
+
+  result = result & """##INFO=<ID=DP,Number=1,Type=Integer,Description="Raw Depth">
 ##INFO=<ID=AF,Number=1,Type=Float,Description="Allele Frequency">
 ##INFO=<ID=SB,Number=1,Type=Integer,Description="Phred-scaled strand bias at this position">
 ##INFO=<ID=DP4,Number=4,Type=Integer,Description="Counts for ref-forward bases, ref-reverse, alt-forward and alt-reverse bases">
 ##INFO=<ID=INDEL,Number=0,Type=Flag,Description="Indicates that the variant is an INDEL.">
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO""" % [dateStr(), src, refFa]
-  echo hdr
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO""" 
 
     
 proc call*(plpFname: string) =
-  writeVcfHeader()
+  echo vcfHeader()
   var plp = parsePlpJson(plpFname)
   echo("FIXME: compute pvalue for ", plp)
 
+  
   
 when isMainModule:
   import cligen
