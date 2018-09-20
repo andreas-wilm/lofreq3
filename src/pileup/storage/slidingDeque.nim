@@ -51,10 +51,13 @@ proc record*(
     value: string,
     refBase: char
   ): void =
+  let length = self.deq.len
+
   assert position >= self.beginning, "The file is not sorted: " & $position & ' ' & $self.beginning
-  assert position <= (self.beginning + self.deq.len), "Invalid position" & $position & $(self.beginning + self.deq.len)
-  if position == (self.beginning + self.deq.len):
-    self.deq.addLast(newPositionData(self.deq.len + self.beginning, refBase))
+  assert position <= (self.beginning + length), "Invalid position" & $position & $(self.beginning + length)
+  
+  if position == (self.beginning + length):
+    self.deq.addLast(newPositionData(length + self.beginning, refBase))
   
   self.deq[position - self.beginning].increment(value)
 
@@ -118,7 +121,7 @@ when isMainModule:
       (given: 10, adjusted: 16),
       (given: 789, adjusted: 1024)
     ]
-    for pair in pairs:
+    for pair in pairs: 
       proc f(d: PositionData): void =
         discard
       var storage = newSlidingDeque(pair.given, f )

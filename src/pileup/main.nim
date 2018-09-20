@@ -6,7 +6,6 @@ import messaging
 import pileup
 import hts
 
-
 type RecordContainer = ref object
   bam: Bam
   chromosomeName: string
@@ -18,10 +17,6 @@ iterator items(self: RecordContainer) : Record =
   for read in self.bam.querys(self.chromosomeName):
     yield read
 
-func lenAsInt(target: Target): int =
-  result = cast[int](target.length)
-  # todo check integer limits
-
 var bam: Bam
 open(bam, paramStr(1), index=true)
 
@@ -32,7 +27,7 @@ if not open(fai, paramStr(2)):
 for chromosome in targets(bam.hdr):
   var storage = newslidingDeque(
                   20,
-                  proc(d: PositionData): void = echo createJsonMessage(d)
+                  proc(d: PositionData): void = writeline(stdout, createJsonMessage(d)) 
                 )
   var records = newRecordContainer(bam, chromosome.name)
   pileup(records, fai.getISequence(), storage)

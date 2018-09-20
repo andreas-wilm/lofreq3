@@ -4,19 +4,6 @@
 import hts 
 import math
 
-# I should perhaps remove this as it is just a special case for 
-# reportMatches and one additional function call per every match may
-# drastically reduce performance. However, I left it for semantic reasons and encapsulation
-# (e.g. beginning of the read). 
-# todo refactor after benchmarking
-proc reportMatch[TSequence, TStorage](storage: var TStorage,
-                 readIndex: int, refIndex: int,
-                 read: Record, reference: TSequence): void =
-  ## Reports one matching base between the read and the reference to the given
-  ## storage object.
-  storage.record(refIndex, $read.baseAt(readIndex), reference.baseAt(refIndex))
-
-
 
 proc reportMatches[TSequence, TStorage](storage: var TStorage, 
                    readStart: int, refStart: int, length: int, 
@@ -24,12 +11,10 @@ proc reportMatches[TSequence, TStorage](storage: var TStorage,
   ## Reports a matching substring between the read and the reference to
   ## the given storage object.
   ## A matching substring consists of multiple continuos matching bases.
-  if length == 1:
-    reportMatch(storage, readStart, refStart, read, reference)
-    return
-
   for offset in countUp(0, length - 1):
-    reportMatch(storage, readStart + offset, refStart + offset, read, reference)
+    let refOff = refStart + offset
+    storage.record(refOff, $read.baseAt(readStart + offset), reference.baseAt(refOff))
+
   
 
 proc reportInsertion[TSequence, TStorage](storage: var TStorage,
@@ -120,7 +105,7 @@ proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable,
       # since the file is sorted and a read CANNOT begin with an insertion or deletion,
       # we can safley flush any information related to
       # indices smaller than the current start of the read
-      var a = storage.flushUpTo(read.start- 1)
+      discard storage.flushUpTo(read.start- 1)
       for event in read.cigar:
         processEvent(event, storage, read, reference, 
                      readOffset, refOffset)
