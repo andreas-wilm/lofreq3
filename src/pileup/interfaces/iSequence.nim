@@ -6,9 +6,9 @@ type
     substring: proc(first, last: int): string {.closure.},
   ]
 
-proc getISequence*(fai: Fai): ISequence = 
-  let name = fai[0]
+proc getISequence*(fai: Fai): ISequence =
+  let sequence = fai.get(fai[0])
   return (
-      baseAt: proc (index: int): char = fai.get(name, index, index)[0],
-      substring: proc (first, last: int): string = fai.get(name, first, last)
+      baseAt: proc (index: int): char = sequence[index],
+      substring: proc (first, last: int): string = sequence[first..last]
     )
