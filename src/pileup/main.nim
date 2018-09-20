@@ -26,8 +26,8 @@ if not open(fai, paramStr(2)):
 
 for chromosome in targets(bam.hdr):
   var storage = newslidingDeque(
-                  20,
-                  proc(d: PositionData): void = writeline(stdout, createJsonMessage(d)) 
+                  200,
+                  proc(d: PositionData): void = writeLine(stdout, createJsonMessage(d)) 
                 )
   var records = newRecordContainer(bam, chromosome.name)
-  pileup(records, fai.getISequence(), storage)
+  pileup(records, fai.getISequence(chromosome.name), storage)
