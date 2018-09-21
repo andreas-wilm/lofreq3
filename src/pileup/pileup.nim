@@ -1,9 +1,7 @@
 ## Implementation of an alternative procedure to samtools' pileup that does not require 
 ## keeping pointers to all the reads in memory and provides support for streaming results
 ## to microservices as soon as possible. This was inspired by https://brentp.github.io/post/no-pile/.
-import hts 
-import math
-
+import hts
 
 proc reportMatches[TSequence, TStorage](storage: var TStorage, 
                    readStart: int, refStart: int, length: int, 
@@ -13,7 +11,9 @@ proc reportMatches[TSequence, TStorage](storage: var TStorage,
   ## A matching substring consists of multiple continuos matching bases.
   for offset in countUp(0, length - 1):
     let refOff = refStart + offset
-    storage.record(refOff, $read.baseAt(readStart + offset), reference.baseAt(refOff))
+    let readOff = readStart + offset
+    storage.recordMatch(refOff, read.baseAt(readOff), int(read.baseQualityAt(readOff)),
+                        reference.baseAt(refOff))
 
   
 
@@ -23,13 +23,12 @@ proc reportInsertion[TSequence, TStorage](storage: var TStorage,
   ## Reports an insertion on the read (wrt. the reference) to the provided storage.
   ## An insertion consists of one or more bases found on the read,
   ## but not on the reference.
-  var value = "+"
-
+  var value = ""
   for offset in countUp(readStart, readStart + length - 1):
     value &= read.baseAt(offset)
 
   # insertion is reported on the base that preceeds it
-  storage.record(refIndex - 1, value , '/')
+  storage.recordInsertion(refIndex - 1, value, 50, '/')
 
 
 
@@ -39,14 +38,13 @@ proc reportDeletion[TSequence, TStorage](storage: var TStorage,
   ## Reports a deletion on the read (wrt. the reference) to the provided storage.\
   ## A deletion consists of one or more bases found on the reference,
   ## but not on the reads.
-  var value = "-"
-
+  var value = ""
   for offset in countUp(refStart, refStart + length - 1):
     value &= reference.baseAt(offset) 
-    storage.record(offset, "*", reference.baseAt(offset))
+    storage.recordMatch(offset, '*', 45, reference.baseAt(offset))
 
   # deletion is reported on the base that preceeds it
-  storage.record(refStart - 1, value, '/')
+  storage.recordDeletion(refStart - 1, value, 40, '/')
 
 
 
@@ -87,6 +85,13 @@ proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorag
                     read, reference)
     readOffset += event.len
 
+proc isInvalid(read: Record): bool =
+  if read.cigar.len == 0:
+    return true
+  case read.cigar[0].op
+    of CigarOp.insert, CigarOp.deletion: true
+    else: false
+
 proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable, 
                                                  reference: TSequence,
                                                  storage: var TStorage): void =
@@ -98,6 +103,11 @@ proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable,
   ## The parameter `storage` is an implementation of a storage object used in
   ## the pileup.
   for read in reads:
+      if read.isInvalid():
+        # Skipping all invalid reads (e.g. beginning with deletions/insertions)
+        # writeLine(stderr, "Skipping invalid read: " & $read)
+        continue
+
       var 
         readOffset = 0
         refOffset = read.start
@@ -105,7 +115,7 @@ proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable,
       # since the file is sorted and a read CANNOT begin with an insertion or deletion,
       # we can safley flush any information related to
       # indices smaller than the current start of the read
-      discard storage.flushUpTo(read.start- 1)
+      discard storage.flushUpTo(read.start)
       for event in read.cigar:
         processEvent(event, storage, read, reference, 
                      readOffset, refOffset)
