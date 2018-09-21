@@ -10,7 +10,8 @@ type
     matches: Table[char, CountTable[int]]
     deletions: Table[string, CountTable[int]]
     insertions: Table[string, CountTable[int]]
-    # chromosome: string
+    # chromosome
+
 
 proc newPositionData* : PositionData =
   PositionData(
@@ -19,6 +20,7 @@ proc newPositionData* : PositionData =
     insertions: initTable[string, CountTable[int]](),
     deletions: initTable[string, CountTable[int]]()
   )
+
 
 proc newPositionData*(referenceIndex: int, referenceBase: char) : PositionData =
   PositionData(
@@ -29,6 +31,7 @@ proc newPositionData*(referenceIndex: int, referenceBase: char) : PositionData =
     deletions: initTable[string, CountTable[int]]()
   )
 
+
 proc addMatch*(self: var PositionData, base: char, quality: int) =
   discard self.matches.hasKeyOrPut(base, initCountTable[int]())
   self.matches[base].inc(quality)
@@ -38,13 +41,11 @@ proc addInsertion*(self: var PositionData, bases: string, quality: int) =
   discard self.insertions.hasKeyOrPut(bases, initCountTable[int]())
   self.insertions[bases].inc(quality)
 
+
 proc addDeletion*(self: var PositionData, bases: string, quality: int) =
   discard self.deletions.hasKeyOrPut(bases, initCountTable[int]())
   self.deletions[bases].inc(quality)
 
-
-proc `$`*(self: var PositionData): string =
-  "(" & "referenceIndex: " & $self.referenceIndex & ", referenceBase: " & $self.referenceBase & ", events: " & $self.matches & ")"
 
 proc `%`*(table: CountTable[int]): JsonNode =
   result = newJObject()
@@ -55,6 +56,7 @@ proc `%`*(table: CountTable[int]): JsonNode =
 
   result.fields = buff
 
+
 proc `%`*[T](table: Table[T, CountTable[int]]): JsonNode =
   result = newJObject()
   
@@ -63,6 +65,7 @@ proc `%`*[T](table: Table[T, CountTable[int]]): JsonNode =
     buff[$pair[0]] = %pair[1]
 
   result.fields = buff
+
 
 proc `%`*(self: PositionData): JsonNode =
   result = %{
