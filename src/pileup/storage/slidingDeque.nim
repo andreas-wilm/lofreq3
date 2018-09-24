@@ -2,32 +2,33 @@ import deques
 import containers/eventData
 import containers/positionData
 import math
-import sequtils
 import ../interfaces/iStorage
 import tables 
+import ../interfaces/iCollector
 
 type SlidingDeque* = ref object
   deq: Deque[PositionData]
-  submit: proc (data: PositionData): void
+  collector: ICollector
   initialSize: int # estimated maximum size of the double ended queue
   beginning: int
 
-proc newSlidingDeque*(initialSize: int, 
-                    submitProc: proc (data: PositionData): void): SlidingDeque =
+
+proc newSlidingDeque*(initialSize: int, collector: ICollector): SlidingDeque =
   let adjustedSize = nextPowerOfTwo(initialSize)
   SlidingDeque(
     deq: initDeque[PositionData](adjustedSize),
-    submit: submitProc, 
+    collector: collector, 
     initialSize: adjustedSize, 
     beginning: 0
   )
+
 
 proc submitDeq(self: SlidingDeque, deq: var Deque[PositionData]): void =
   # todo implement
   # asyncronous function
   # Submits the current deque to another thread for handling
   for element in deq:
-    self.submit(element)
+    self.collector.submit(element)
 
 
 proc resetDeq(self: SlidingDeque, beginning: int) =
@@ -40,10 +41,12 @@ proc resetDeq(self: SlidingDeque, beginning: int) =
   self.deq = initDeque[PositionData](self.initialSize)
   self.beginning = beginning
 
+
 proc `[]`(self: SlidingDeque, position:int): PositionData =
   if position < self.beginning or position >= self.beginning + self.deq.len:
     raise newException(ValueError, "Illegal position")
   return self.deq[position - self.beginning]
+
 
 proc extendStorage(self: SlidingDeque, position:int, refBase: char): void =
   let length = self.deq.len
@@ -55,17 +58,20 @@ proc extendStorage(self: SlidingDeque, position:int, refBase: char): void =
     self.deq.addLast(newPositionData(length + self.beginning, refBase))
   
 
+
 proc recordMatch*(self: SlidingDeque, position: int, 
   base: char, quality: int, refBase: char): void =
 
   self.extendStorage(position, refBase)
   self.deq[position - self.beginning].addMatch(base, quality)
     
+
 proc recordDeletion*(self: SlidingDeque, position: int, 
   bases: string, quality: int, refBase: char): void =
 
   self.extendStorage(position, refBase)
   self.deq[position - self.beginning].addDeletion(bases, quality)
+
 
 proc recordInsertion*(self: SlidingDeque, position: int, 
   bases: string, quality: int, refBase: char): void =
@@ -74,9 +80,11 @@ proc recordInsertion*(self: SlidingDeque, position: int,
   self.deq[position - self.beginning].addInsertion(bases, quality)
 
 
+
 proc flushAll*(self: SlidingDeque): int =
   result = self.deq.len
   self.resetDeq(0)
+
 
 proc flushUpTo*(self: SlidingDeque, position: int): int = 
   ## Flushes/submits all finished slots in the storage. This is meant to be 
@@ -97,9 +105,10 @@ proc flushUpTo*(self: SlidingDeque, position: int): int =
     return result
 
   while self.beginning < position: # -1 because of the insertions on read starts
-    self.submit(self.deq.popFirst())
+    self.collector.submit(self.deq.popFirst())
     self.beginning.inc
     result.inc
+
 
 
 proc getIStorage*(self: SlidingDeque): IStorage=
