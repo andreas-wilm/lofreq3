@@ -1,70 +1,36 @@
 import eventData
-import tables
 import json
-
 
 type
   PositionData* = ref object
     referenceIndex*: int
     referenceBase*: char
-    matches: Table[char, CountTable[int]]
-    deletions: Table[string, CountTable[int]]
-    insertions: Table[string, CountTable[int]]
-    # chromosome
-
-
-proc newPositionData* : PositionData =
-  PositionData(
-    referenceIndex: 0, 
-    matches: initTable[char, CountTable[int]](),
-    insertions: initTable[string, CountTable[int]](),
-    deletions: initTable[string, CountTable[int]]()
-  )
+    matches: EventData[char]
+    deletions: EventData[string]
+    insertions: EventData[string]
+    # chromosome - injected after pileup is done in order to save space and time
 
 
 proc newPositionData*(referenceIndex: int, referenceBase: char) : PositionData =
   PositionData(
     referenceIndex: referenceIndex,
     referenceBase: referenceBase,
-    matches: initTable[char, CountTable[int]](),
-    insertions: initTable[string, CountTable[int]](),
-    deletions: initTable[string, CountTable[int]]()
+    matches: initEventData[char](),
+    insertions: initEventData[string](),
+    deletions: initEventData[string]()
   )
 
 
 proc addMatch*(self: var PositionData, base: char, quality: int) =
-  discard self.matches.hasKeyOrPut(base, initCountTable[int]())
-  self.matches[base].inc(quality)
+  self.matches.add(base, quality)
 
 
 proc addInsertion*(self: var PositionData, bases: string, quality: int) =
-  discard self.insertions.hasKeyOrPut(bases, initCountTable[int]())
-  self.insertions[bases].inc(quality)
+  self.insertions.add(bases, quality)
 
 
 proc addDeletion*(self: var PositionData, bases: string, quality: int) =
-  discard self.deletions.hasKeyOrPut(bases, initCountTable[int]())
-  self.deletions[bases].inc(quality)
-
-
-proc `%`*(table: CountTable[int]): JsonNode =
-  result = newJObject()
-  
-  var buff = initOrderedTable[string, JsonNode]()
-  for pair in table.pairs:  
-    buff[$pair[0]] = %pair[1]
-
-  result.fields = buff
-
-
-proc `%`*[T](table: Table[T, CountTable[int]]): JsonNode =
-  result = newJObject()
-  
-  var buff = initOrderedTable[string, JsonNode]()
-  for pair in table.pairs:
-    buff[$pair[0]] = %pair[1]
-
-  result.fields = buff
+  self.deletions.add(bases, quality)
 
 
 proc `%`*(self: PositionData): JsonNode =
