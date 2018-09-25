@@ -9,7 +9,7 @@ const DEFAULT_BLANK_QUALITY = 40
 
 
 proc reportMatches[TSequence, TStorage](storage: var TStorage,
-                   readStart: int, refStart: int, length: int 
+                   readStart: int, refStart: int, length: int,
                    read: Record, reference: TSequence) : void =
   ## Reports a matching substring between the read and the reference to
   ## the given storage object.
