@@ -73,11 +73,13 @@ proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorag
   ## Processes one event (cigar element) on the read
 
   let operation = event.op
+
   if operation == soft_clip:
     readOffset += event.len
     return
-  if operation == hard_clip: raise newException(ValueError, "hard clip")
-  assert operation != ref_skip and operation != pad, "Illegal operation"
+  
+  if operation == hard_clip or operation == ref_skip or operation == pad: 
+    raise newException(ValueError, "Invalid operation: " & $operation)
 
 
   let consumes = event.consumes()
@@ -104,11 +106,8 @@ proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorag
                     read, reference)
     readOffset += event.len
 
-    
-proc isInvalid(read: Record): bool =
-  if read.cigar.len == 0:
-    return true
-  case read.cigar[0].op
+proc isInvalid(cigar: Cigar): bool =
+  case cigar[0].op
     of CigarOp.insert, CigarOp.deletion: true
     else: false
 
@@ -124,9 +123,11 @@ proc pileup[TSequence, TReadIterable, TStorage](reads: TReadIterable,
   ## The parameter `storage` is an implementation of a storage object used in
   ## the pileup.
   for read in reads:
-      if read.isInvalid():
+      let cigar = read.cigar
+
+      if cigar.isInvalid():
         # Skipping all invalid reads (e.g. beginning with deletions/insertions)
-        # writeLine(stderr, "Skipping invalid read: " & $read)
+        writeLine(stderr, "WARNING: Skipping read with invalid CIGAR: " & $read)
         continue
 
       var 
@@ -137,9 +138,11 @@ proc pileup[TSequence, TReadIterable, TStorage](reads: TReadIterable,
       # we can safley flush any information related to
       # indices smaller than the current start of the read
       discard storage.flushUpTo(read.start)
-      for event in read.cigar:
+      for event in cigar:
         processEvent(event, storage, read, reference, 
                      readOffset, refOffset)
+
+  # the pileup is done and all positions can be flushed      
   discard storage.flushAll()
 
 
