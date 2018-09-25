@@ -9,7 +9,7 @@ type JsonCollector* = ref object
 proc newJsonCollector*(chromosome: string): JsonCollector =
   JsonCollector(chromosome: chromosome)
 
-proc addChromosome(data: JsonNode, chromosome: string): JsonNode = 
+proc addChromosome(data: JsonNode, chromosome: string): JsonNode =
   data["chromosome"] = %chromosome
   return data
 
@@ -19,6 +19,6 @@ proc submit*(self: JsonCollector, data: PositionData): void =
 
 proc getICollector*(self: JsonCollector): ICollector =
   return (
-      submit: proc(data: PositionData): void = 
+      submit: proc(data: PositionData): void =
         self.submit(data),
      )

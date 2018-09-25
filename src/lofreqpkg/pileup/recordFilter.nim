@@ -13,7 +13,7 @@ const FAILS_VENDOR_CHECK*    = 512
 const PCR_OR_DUPLICATE*      = 1024
 const SUPPLEMENTARY*         = 2048
 
-const DEFAULT_IGNORE_FLAGS*: uint16 = 
+const DEFAULT_IGNORE_FLAGS*: uint16 =
   READ_UNMAPPED or 
   NOT_PRIMARY_ALIGNMENT or
   FAILS_VENDOR_CHECK or
@@ -25,21 +25,21 @@ type RecordFilter = ref object
   ignoreFlag: uint16
   chromosomeName: string
 
-proc newRecordFilter*(bam: Bam, chromosomeName: string, 
+proc newRecordFilter*(bam: Bam, chromosomeName: string,
                       ignoreFlags: varargs[uint16]): RecordFilter =
   var finalFlag: uint16
 
   if ignoreFlags.len == 0:
     finalFlag = DEFAULT_IGNORE_FLAGS
   else:
-    for flag in ignoreFlags: 
+    for flag in ignoreFlags:
       finalFlag = finalFlag or flag
   
-  return RecordFilter(bam: bam, chromosomeName: chromosomeName, 
+  return RecordFilter(bam: bam, chromosomeName: chromosomeName,
                ignoreFlag: finalFlag)
 
 
-iterator items*(self: RecordFilter) : Record = 
+iterator items*(self: RecordFilter) : Record =
   for read in self.bam.querys(self.chromosomeName):
     if (read.flag and self.ignoreFlag) == 0:
       yield read
