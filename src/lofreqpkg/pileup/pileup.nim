@@ -1,7 +1,29 @@
 ## Implementation of an alternative procedure to samtools' pileup that does not require 
 ## keeping pointers to all the reads in memory and provides support for streaming results
 ## to microservices as soon as possible. This was inspired by https://brentp.github.io/post/no-pile/.
+import os
+import messaging
+
 import hts
+
+import interfaces/iSequence
+import storage/containers/positionData
+import storage/slidingDeque
+
+
+type RecordContainer = ref object
+  bam: Bam
+  chromosomeName: string
+
+  
+proc newRecordContainer(bam: Bam, chromosomeName: string): RecordContainer =
+  return RecordContainer(bam: bam, chromosomeName: chromosomeName)
+
+  
+iterator items(self: RecordContainer) : Record = 
+  for read in self.bam.querys(self.chromosomeName):
+    yield read
+
 
 proc reportMatches[TSequence, TStorage](storage: var TStorage, 
                    readStart: int, refStart: int, length: int, 
@@ -15,7 +37,6 @@ proc reportMatches[TSequence, TStorage](storage: var TStorage,
     storage.recordMatch(refOff, read.baseAt(readOff), int(read.baseQualityAt(readOff)),
                         reference.baseAt(refOff))
 
-  
 
 proc reportInsertion[TSequence, TStorage](storage: var TStorage,
                      readStart: int, refIndex: int, length: int,
@@ -31,7 +52,6 @@ proc reportInsertion[TSequence, TStorage](storage: var TStorage,
   storage.recordInsertion(refIndex - 1, value, 50, '/')
 
 
-
 proc reportDeletion[TSequence, TStorage](storage: var TStorage,
                     readStart: int, refStart: int, length: int,
                     reference: TSequence): void =
@@ -45,7 +65,6 @@ proc reportDeletion[TSequence, TStorage](storage: var TStorage,
 
   # deletion is reported on the base that preceeds it
   storage.recordDeletion(refStart - 1, value, 40, '/')
-
 
 
 proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorage, 
@@ -85,6 +104,7 @@ proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorag
                     read, reference)
     readOffset += event.len
 
+    
 proc isInvalid(read: Record): bool =
   if read.cigar.len == 0:
     return true
@@ -92,7 +112,8 @@ proc isInvalid(read: Record): bool =
     of CigarOp.insert, CigarOp.deletion: true
     else: false
 
-proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable, 
+    
+proc pileup[TSequence, TReadIterable, TStorage](reads: TReadIterable, 
                                                  reference: TSequence,
                                                  storage: var TStorage): void =
   ## Performs a pileup over all reads provided by the read iterable parameter and reports
@@ -120,3 +141,26 @@ proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable,
         processEvent(event, storage, read, reference, 
                      readOffset, refOffset)
   discard storage.flushAll()
+
+
+proc pileup*(bamFname: string, faFname: string) =
+  var bam: Bam
+  var fai: Fai
+
+  if not open(fai, faFname):
+    quit("Could not open fasta file.")
+  
+  open(bam, bamFname, index=true)
+  
+  for chromosome in targets(bam.hdr):
+    var storage = newslidingDeque(
+                    200,
+                    proc(d: PositionData): void = writeLine(stdout, createJsonMessage(d)) 
+                  )
+    var records = newRecordContainer(bam, chromosome.name)
+    pileup(records, fai.getISequence(chromosome.name), storage)
+    
+
+when isMainModule:
+  import cligen
+  dispatch(pileup)
