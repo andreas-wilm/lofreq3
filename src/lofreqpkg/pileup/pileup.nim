@@ -9,7 +9,7 @@ import hts
 import interfaces/iSequence
 import storage/containers/positionData
 import storage/slidingDeque
-import recordfilter
+import recordFilter
 import jsonCollector
 
 
