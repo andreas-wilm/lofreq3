@@ -9,20 +9,8 @@ import hts
 import interfaces/iSequence
 import storage/containers/positionData
 import storage/slidingDeque
-
-
-type RecordContainer = ref object
-  bam: Bam
-  chromosomeName: string
-
-  
-proc newRecordContainer(bam: Bam, chromosomeName: string): RecordContainer =
-  return RecordContainer(bam: bam, chromosomeName: chromosomeName)
-
-  
-iterator items(self: RecordContainer) : Record = 
-  for read in self.bam.querys(self.chromosomeName):
-    yield read
+import recordfilter
+import jsonCollector
 
 
 proc reportMatches[TSequence, TStorage](storage: var TStorage, 
@@ -106,6 +94,7 @@ proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorag
                     read, reference)
     readOffset += event.len
 
+    
 proc isInvalid(cigar: Cigar): bool =
   case cigar[0].op
     of CigarOp.insert, CigarOp.deletion: true
@@ -156,14 +145,17 @@ proc pileup*(bamFname: string, faFname: string) =
   open(bam, bamFname, index=true)
   
   for chromosome in targets(bam.hdr):
-    var storage = newslidingDeque(
-                    200,
-                    proc(d: PositionData): void = writeLine(stdout, createJsonMessage(d)) 
-                  )
-    var records = newRecordContainer(bam, chromosome.name)
-    pileup(records, fai.getISequence(chromosome.name), storage)
+    let name = chromosome.name
+  
+    var records = newRecordFilter(bam, name)
+    var reference = fai.getISequence(name)
     
+    var storage = newSlidingDeque(200, newJsonCollector(name).getICollector)
+  
+  
+    pileup(records, reference, storage)
 
+    
 when isMainModule:
   import cligen
   dispatch(pileup)
