@@ -3,7 +3,7 @@ import containers/eventData
 import containers/positionData
 import math
 import ../interfaces/iStorage
-import tables 
+import tables
 import ../interfaces/iCollector
 
 type SlidingDeque* = ref object
@@ -17,8 +17,8 @@ proc newSlidingDeque*(initialSize: int, collector: ICollector): SlidingDeque =
   let adjustedSize = nextPowerOfTwo(initialSize)
   SlidingDeque(
     deq: initDeque[PositionData](adjustedSize),
-    collector: collector, 
-    initialSize: adjustedSize, 
+    collector: collector,
+    initialSize: adjustedSize,
     beginning: 0
   )
 
@@ -59,24 +59,21 @@ proc extendStorage(self: SlidingDeque, position:int, refBase: char): void =
   
 
 
-proc recordMatch*(self: SlidingDeque, position: int, 
-  base: char, quality: int, refBase: char): void =
-
+proc recordMatch*(self: SlidingDeque, position: int,
+                  base: char, quality: int, refBase: char): void =
   self.extendStorage(position, refBase)
   self.deq[position - self.beginning].addMatch(base, quality)
     
 
-proc recordDeletion*(self: SlidingDeque, position: int, 
-  bases: string, quality: int, refBase: char): void =
-
-  self.extendStorage(position, refBase)
+proc recordDeletion*(self: SlidingDeque, position: int,
+                     bases: string, quality: int): void =
+  assert position < self.beginning + self.deq.len
   self.deq[position - self.beginning].addDeletion(bases, quality)
 
 
-proc recordInsertion*(self: SlidingDeque, position: int, 
-  bases: string, quality: int, refBase: char): void =
-
-  self.extendStorage(position, refBase)
+proc recordInsertion*(self: SlidingDeque, position: int,
+                      bases: string, quality: int): void =
+  assert position < self.beginning + self.deq.len
   self.deq[position - self.beginning].addInsertion(bases, quality)
 
 
@@ -86,7 +83,7 @@ proc flushAll*(self: SlidingDeque): int =
   self.resetDeq(0)
 
 
-proc flushUpTo*(self: SlidingDeque, position: int): int = 
+proc flushUpTo*(self: SlidingDeque, position: int): int =
   ## Flushes/submits all finished slots in the storage. This is meant to be 
   ## called when starting to process a new read
   ## 
@@ -113,11 +110,11 @@ proc flushUpTo*(self: SlidingDeque, position: int): int =
 
 proc getIStorage*(self: SlidingDeque): IStorage=
   return (
-        record: proc(position: int,value: string,refBase: char): void= 
-          self.recordDeletion(position, value,50, refBase), #todo WRONG!!!
-        flushUpTo: proc(position: int): int = 
+        record: proc(position: int,value: string,refBase: char): void =
+          self.recordDeletion(position, value,50), #todo WRONG!!!
+        flushUpTo: proc(position: int): int =
           self.flushUpTo(position),
-        flushAll: proc(): int  = 
+        flushAll: proc(): int  =
           self.flushAll()
        )
 

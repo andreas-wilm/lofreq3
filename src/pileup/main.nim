@@ -19,8 +19,7 @@ for chromosome in targets(bam.hdr):
 
   var records = newRecordFilter(bam, name)
   var reference = fai.getISequence(name)
-  
-  var storage = newSlidingDeque(200, newJsonCollector(name).getICollector)
 
+  var storage = newSlidingDeque(200, newJsonCollector(name).getICollector)
 
   pileup(records, reference, storage)
