@@ -2,23 +2,17 @@ import json
 import storage/containers/positionData
 import interfaces/iCollector
 
-type JsonCollector* = ref object
-  chromosome: string
+type JsonCollector*[TNext] = ref object
+  next: TNext
 
+proc newJsonCollector*[TNext](next: TNext): JsonCollector[TNext] =
+  JsonCollector[TNext](next: next)
 
-proc newJsonCollector*(chromosome: string): JsonCollector =
-  JsonCollector(chromosome: chromosome)
-
-proc addChromosome(data: JsonNode, chromosome: string): JsonNode = 
-  data["chromosome"] = %chromosome
-  return data
-
-proc submit*(self: JsonCollector, data: PositionData): void =
-  writeLine(stdout, (%data).addChromosome(self.chromosome))
-
+proc submit*[TData](self: JsonCollector, data: TData): void =
+  self.next.submit2(%data)
 
 proc getICollector*(self: JsonCollector): ICollector =
   return (
-      submit: proc(data: PositionData): void = 
-        self.submit(data),
-     )
+        submit: proc(data: PositionData): void =
+          self.submit(data)
+        )
