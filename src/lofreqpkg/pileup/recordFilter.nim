@@ -1,5 +1,11 @@
+## Implements a record filter for BAM files. The 'RecordFilter'
+## object is a 'decorator' for records received by querying the BAM
+## file. It lets through all records which belong to a specified 
+## chromosome and are not marked with certain flags.
 import hts
 
+## All the possible flags for the records. Use this instead of raw numbers
+# NOTE: an enum might be a better fit for this
 const PAIRED_READ*           = 1
 const MAPPED_IN_PROPER_PAIR* = 2
 const READ_UNMAPPED*         = 4
@@ -13,6 +19,8 @@ const FAILS_VENDOR_CHECK*    = 512
 const PCR_OR_DUPLICATE*      = 1024
 const SUPPLEMENTARY*         = 2048
 
+## All the flags ignored by default. If no flags are specified in the constructor,
+## use this. 
 const DEFAULT_IGNORE_FLAGS*: uint16 =
   READ_UNMAPPED or 
   NOT_PRIMARY_ALIGNMENT or
@@ -27,6 +35,11 @@ type RecordFilter = ref object
 
 proc newRecordFilter*(bam: Bam, chromosomeName: string,
                       ignoreFlags: varargs[uint16]): RecordFilter =
+  ## Constructs a new 'RecordFilter' object. The reads that are allowed
+  ## through the filter: 
+  ## 1. Belong to the provided chromosome
+  ## 2. Are marked with non of the specified flags (if no flag is specified,
+  ## the default is used)
   var finalFlag: uint16
 
   if ignoreFlags.len == 0:
@@ -40,6 +53,9 @@ proc newRecordFilter*(bam: Bam, chromosomeName: string,
 
 
 iterator items*(self: RecordFilter) : Record =
+  ## Enables transparent iteration in for..in loops. Makes 
+  ## any 'RecordFilter' object an iterable. This method should
+  ## in most cases be called implicitly.
   for read in self.bam.querys(self.chromosomeName):
     if (read.flag and self.ignoreFlag) == 0:
       yield read
