@@ -1,3 +1,9 @@
+## The module implements a storage mechanism for the :pileup data.
+## It uses a queue to organize 'PositionData' slots and it collects data
+## in a scanning left-to-right fasion. The storage can be flushed gradually. 
+## This means that data can be submitted to further processing as soon as it 
+## finds itself behind the 'scan line', no need to wait for the whole pileup 
+## to finish.
 import deques
 import containers/eventData
 import containers/positionData
@@ -14,6 +20,9 @@ type SlidingDeque* = ref object
 
 
 proc newSlidingDeque*(initialSize: int, collector: ICollector): SlidingDeque =
+  ## Constructs a new SlidingDeque object. 
+  ## The paramater 'collector' holds an object in charge of the further processing.
+  ## There is an optional initial size argument for the queue.
   let adjustedSize = nextPowerOfTwo(initialSize)
   SlidingDeque(
     deq: initDeque[PositionData](adjustedSize),
@@ -61,34 +70,38 @@ proc extendStorage(self: SlidingDeque, position:int, refBase: char): void =
 
 proc recordMatch*(self: SlidingDeque, position: int,
                   base: char, quality: int, refBase: char): void =
+  ## Records match event information on for a given position
   self.extendStorage(position, refBase)
   self.deq[position - self.beginning].addMatch(base, quality)
     
 
 proc recordDeletion*(self: SlidingDeque, position: int,
                      bases: string, quality: int): void =
+  ## Records deletion event information for a given position.
   assert position < self.beginning + self.deq.len
   self.deq[position - self.beginning].addDeletion(bases, quality)
 
 
 proc recordInsertion*(self: SlidingDeque, position: int,
                       bases: string, quality: int): void =
+  ## Records insertion event infromation for a given position.
   assert position < self.beginning + self.deq.len
   self.deq[position - self.beginning].addInsertion(bases, quality)
 
 
 
 proc flushAll*(self: SlidingDeque): int =
+  ## Submits all elements currently contained in the queue 
+  ## for further processing. The method returns the number of
+  ## submitted elements
   result = self.deq.len
   self.resetDeq(0)
 
 
 proc flushUpTo*(self: SlidingDeque, position: int): int =
-  ## Flushes/submits all finished slots in the storage. This is meant to be 
-  ## called when starting to process a new read
-  ## 
-  ## @return the number of flushed items (primarily for testing and debugging purposes,
-  ## feel free to remove when in release)
+  ## Submits all elements with positions on the reference smaller than the given
+  ## argument to further processing. Enables the queue to slide. The method returns number
+  ## of submitted elements.
   if position < self.beginning - 1:
     raise newException(ValueError, "Flush index lower than beginning.")
   
@@ -109,6 +122,7 @@ proc flushUpTo*(self: SlidingDeque, position: int): int =
 
 
 proc getIStorage*(self: SlidingDeque): IStorage=
+  # I need to decide whehter to use this or delete it. It is currently useless.
   return (
         record: proc(position: int,value: string,refBase: char): void =
           self.recordDeletion(position, value,50), #todo WRONG!!!

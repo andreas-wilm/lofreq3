@@ -1,8 +1,20 @@
+## The module implements a pileup algorithm performed over a single chromosome and
+## its reads.
+
 import hts
 
+# placeholders until we find a way to record true qualities
 const DEFAULT_DELETION_QUALITY = 40
 const DEFAULT_INSERTION_QUALITY = 40
 const DEFAULT_BLANK_QUALITY = 40
+const DEFAULT_BLANK_SYMBOL = '*'
+
+proc allowed(operation: CigarOp): bool =
+  ## Determines whether a cigar operation is allowed or not.
+  ## Returns true if allowed, false otherwise.
+  case operation
+    of hard_clip, ref_skip, pad: false
+    else: true
 
 
 proc reportMatches[TSequence, TStorage](storage: var TStorage,
@@ -37,13 +49,14 @@ proc reportInsertion[TSequence, TStorage](storage: var TStorage,
 proc reportDeletion[TSequence, TStorage](storage: var TStorage,
                     readStart: int, refStart: int, length: int,
                     reference: TSequence): void =
-  ## Reports a deletion on the read (wrt. the reference) to the provided storage.\
+  ## Reports a deletion on the read (wrt. the reference) to the provided storage.
   ## A deletion consists of one or more bases found on the reference,
   ## but not on the reads.
   var value = ""
   for offset in countUp(refStart, refStart + length - 1):
     value &= reference.baseAt(offset)
-    storage.recordMatch(offset, '*',DEFAULT_BLANK_QUALITY, reference.baseAt(offset))
+    storage.recordMatch(offset, DEFAULT_BLANK_SYMBOL ,DEFAULT_BLANK_QUALITY,
+                        reference.baseAt(offset))
 
   # deletion is reported on the base that preceeds it
   storage.recordDeletion(refStart - 1, value, DEFAULT_DELETION_QUALITY)
@@ -53,18 +66,22 @@ proc reportDeletion[TSequence, TStorage](storage: var TStorage,
 proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorage,
                   read: Record, reference: TSequence,
                   readOffset: var int, refOffset: var int): void =
-  ## Processes one event (cigar element) on the read
-
+  ## Processes one event (cigar element) on the read and advances the offsets
+  ## accordingly. The event is described by the first argument, 'event'. The parameter 'storage'
+  ## provides a reference to the storage used to record the events. 'read' and 'reference' are the
+  ## read and the reference sequences. 'readOffset' and 'refOffset' are references to variables marking
+  ## the current position on the read and the reference respectively. As they are references, the function 
+  ## modifies outside values.
   let operation = event.op
+  
+  if not operation.allowed:
+    raise newException(ValueError, "Invalid operation: " & $operation)
 
   if operation == soft_clip:
+    # a soft clip is not reported but advaces the position on the read
     readOffset += event.len
     return
   
-  if operation == hard_clip or operation == ref_skip or operation == pad:
-    raise newException(ValueError, "Invalid operation: " & $operation)
-
-
   let consumes = event.consumes()
   
   if consumes.query and consumes.reference:
@@ -89,10 +106,13 @@ proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorag
                     read, reference)
     readOffset += event.len
 
-proc isInvalid(cigar: Cigar): bool =
+
+proc valid(cigar: Cigar): bool =
+  ## Tests whether a CIGAR is valid.
+  ## Returns true if the CIGAR is valid, false otherwise.
   case cigar[0].op
-    of CigarOp.insert, CigarOp.deletion: true
-    else: false
+    of CigarOp.insert, CigarOp.deletion: false
+    else: true 
 
     
 proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable,
@@ -108,7 +128,7 @@ proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable,
   for read in reads:
       let cigar = read.cigar
 
-      if cigar.isInvalid():
+      if not cigar.valid:
         # Skipping all invalid reads (e.g. beginning with deletions/insertions)
         writeLine(stderr, "WARNING: Skipping read with invalid CIGAR: " & $read)
         continue
