@@ -6,7 +6,7 @@ type
     substring: proc(first, last: int): string {.closure.},
   ]
 
-proc getISequence*(fai: Fai, name: string): ISequence =
+proc loadSequence*(fai: Fai, name: string): ISequence =
   let sequence = fai.get(name)
   return (
       baseAt: proc (index: int): char = sequence[index],
