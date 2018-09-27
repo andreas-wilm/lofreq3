@@ -1,11 +1,13 @@
 import os
 import interfaces/iSequence
+import storage/containers/positionData
 import storage/slidingDeque
 import algorithm
 import hts
 import recordFilter
-import util
-import postprocessing
+import jsonCollector
+import consoleWriter
+import chromosomeInjector
 
 var bam: Bam
 open(bam, paramStr(1), index=true)
@@ -18,13 +20,8 @@ for chromosome in targets(bam.hdr):
   let name = chromosome.name
 
   var records = newRecordFilter(bam, name)
-  var reference = fai.loadSequence(name)
-  
-  var injectChromosome = chromosomeInjector(name)
-  var handler = toJson
-    .then(injectChromosome)
-    .thenDo(printOutput)
+  var reference = fai.getISequence(name)
+  var handler = newJsonCollector(newChromosomeInjector(newStreamWriter(), name))
+  var storage = newSlidingDeque(200, handler.getICollector)
 
-  var storage = newSlidingDeque(200, handler)
-  
   pileup(records, reference, storage)

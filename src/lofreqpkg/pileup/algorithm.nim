@@ -1,6 +1,5 @@
 ## The module implements a pileup algorithm performed over a single chromosome and
 ## its reads.
-
 import hts
 
 # placeholders until we find a way to record true qualities
@@ -48,7 +47,7 @@ proc reportInsertion[TSequence, TStorage](storage: var TStorage,
 
 proc reportDeletion[TSequence, TStorage](storage: var TStorage,
                     readStart: int, refStart: int, length: int,
-                    reference: TSequence): void =
+                    read: Record, reference: TSequence): void =
   ## Reports a deletion on the read (wrt. the reference) to the provided storage.
   ## A deletion consists of one or more bases found on the reference,
   ## but not on the reads.
@@ -65,13 +64,13 @@ proc reportDeletion[TSequence, TStorage](storage: var TStorage,
 
 proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorage,
                   read: Record, reference: TSequence,
-                  readOffset: var int, refOffset: var int): void =
-  ## Processes one event (cigar element) on the read and advances the offsets
-  ## accordingly. The event is described by the first argument, 'event'. The parameter 'storage'
+                  readOffset: int, refOffset: int): (int, int) =
+  ## Processes one event (cigar element) on the read and returns the updated offset 
+  ## The event is described by the first argument, 'event'. The parameter 'storage'
   ## provides a reference to the storage used to record the events. 'read' and 'reference' are the
-  ## read and the reference sequences. 'readOffset' and 'refOffset' are references to variables marking
-  ## the current position on the read and the reference respectively. As they are references, the function 
-  ## modifies outside values.
+  ## read and the reference sequences. 'readOffset' and 'refOffset' mark the current position 
+  ## on the read and the reference respectively. After processing the event, the function
+  ## returns new offsets as a tuple.
   let operation = event.op
   
   if not operation.allowed:
@@ -79,8 +78,7 @@ proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorag
 
   if operation == soft_clip:
     # a soft clip is not reported but advaces the position on the read
-    readOffset += event.len
-    return
+    return (readOffset + event.len, refOffset)
   
   let consumes = event.consumes()
   
@@ -89,39 +87,40 @@ proc processEvent[TSequence, TStorage](event: CigarElement, storage: var TStorag
     reportMatches(storage,
                   readOffset, refOffset, event.len,
                   read, reference)
-    readOffset += event.len
-    refOffset += event.len
+    return (readOffset + event.len, refOffset + event.len)
 
-  elif consumes.reference:
+  if consumes.reference:
     # reference only, report deletion
     reportDeletion(storage,
                    readOffset, refOffset, event.len,
-                   reference)
-    refOffset += event.len
+                   read, reference)
+    return (readOffset, refOffset + event.len)
 
-  elif consumes.query:
+  if consumes.query:
     # read only, report insertion
     reportInsertion(storage,
                     readOffset, refOffset, event.len,
                     read, reference)
-    readOffset += event.len
-
+    return (readOffset + event.len, refOffset)
+  
+  raise newException(ValueError, "Operation does not consume anything.")
 
 proc valid(cigar: Cigar): bool =
   ## Tests whether a CIGAR is valid.
   ## Returns true if the CIGAR is valid, false otherwise.
+  ## todo check the rest of the cigar to prevent later exceptions
   case cigar[0].op
     of CigarOp.insert, CigarOp.deletion: false
     else: true 
 
     
-proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable,
+proc pileup*[TSequence, TRecordIterable, TStorage](reads: TRecordIterable,
                                                  reference: TSequence,
                                                  storage: var TStorage): void =
   ## Performs a pileup over all reads provided by the read iterable parameter and reports
   ## the results to the given storage object.
-  ## The parameter `reads` is an iterable (has an `items` method) providing all
-  ## reads which should be piled up.
+  ## The parameter `reads` is an iterable (has an `items` method) yielding all
+  ## reads which should be piled up. It must yield objects of type 'Bam.Record'.
   ## The parameter `reference` is an interface for accessing the reference sequence.
   ## The parameter `storage` is an implementation of a storage object used in
   ## the pileup.
@@ -142,8 +141,9 @@ proc pileup*[TSequence, TReadIterable, TStorage](reads: TReadIterable,
       # indices smaller than the current start of the read
       discard storage.flushUpTo(read.start)
       for event in cigar:
-        processEvent(event, storage, read, reference,
-                     readOffset, refOffset)
+        (readOffset, refOffset) =
+          processEvent(event, storage, read, reference,
+                       readOffset, refOffset)
 
   # the pileup is done and all positions can be flushed      
   discard storage.flushAll()

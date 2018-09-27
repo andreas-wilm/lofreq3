@@ -1,32 +1,33 @@
 ## The module implements a storage mechanism for the :pileup data.
 ## It uses a queue to organize 'PositionData' slots and it collects data
 ## in a scanning left-to-right fasion. The storage can be flushed gradually. 
-## This means that data can be submitted to further processing as soon as it 
+## This means that data can be submitted for further processing as soon as it 
 ## finds itself behind the 'scan line', no need to wait for the whole pileup 
 ## to finish.
 import deques
 import containers/eventData
 import containers/positionData
 import math
-import ../interfaces/iStorage
 import tables
-import ../interfaces/iCollector
+import ../interfaces/pSubmit
 
+# NOTE: The quue does not really need to be double ended, but the 'Queue' module
+# is deprecated.
 type SlidingDeque* = ref object
   deq: Deque[PositionData]
-  collector: ICollector
+  submit: PSubmit[PositionData]
   initialSize: int # estimated maximum size of the double ended queue
   beginning: int
 
 
-proc newSlidingDeque*(initialSize: int, collector: ICollector): SlidingDeque =
+proc newSlidingDeque*(initialSize: int, submit: PSubmit[PositionData]): SlidingDeque =
   ## Constructs a new SlidingDeque object. 
-  ## The paramater 'collector' holds an object in charge of the further processing.
+  ## The paramater 'submit' is a function expected to perform all furhter processing.
   ## There is an optional initial size argument for the queue.
   let adjustedSize = nextPowerOfTwo(initialSize)
   SlidingDeque(
     deq: initDeque[PositionData](adjustedSize),
-    collector: collector,
+    submit: submit,
     initialSize: adjustedSize,
     beginning: 0
   )
@@ -34,39 +35,47 @@ proc newSlidingDeque*(initialSize: int, collector: ICollector): SlidingDeque =
 
 proc submitDeq(self: SlidingDeque, deq: var Deque[PositionData]): void =
   # todo implement
-  # asyncronous function
-  # Submits the current deque to another thread for handling
+  # asyncronous function (probably outside of this module)
+  # Submits the current deque to another thread for furhter processing
   for element in deq:
-    self.collector.submit(element)
+    self.submit(element)
 
 
 proc resetDeq(self: SlidingDeque, beginning: int) =
-  # Submits the current deque and replaces it with a new one
-  #
-  # PARAMTERS:
-  # self - this sliding deque
-  # beginning - the beginning position of the new deque
+  # Submits all elements from the current deque for furhter processing.
   self.submitDeq(self.deq)
   self.deq = initDeque[PositionData](self.initialSize)
   self.beginning = beginning
 
 
 proc `[]`(self: SlidingDeque, position:int): PositionData =
+  ## Access a position in the deque, for testing purposes.
   if position < self.beginning or position >= self.beginning + self.deq.len:
     raise newException(ValueError, "Illegal position")
   return self.deq[position - self.beginning]
 
 
+proc sanityCheck(beginning, length, position: int) : void =
+  ## Checks whether the given position is valid based on the
+  ## current deque beginning and length. Allows the deque to be extended. 
+  assert position >= beginning, "The file is not sorted: " & $position & ' ' & $beginning
+  assert position <= (beginning + length), "Invalid position" & $position & $(beginning + length)
+  
+
+proc sanityCheckNoExtend(beginning, length, position: int): void =
+  ## Checks whether the given position is valid based on the
+  ## current deque beginning and length. Does not allow the deque to be extended.
+  assert position >= beginning, "The file is not sorted: " & $position & ' ' & $beginning
+  assert position < beginning + length
+
+
 proc extendStorage(self: SlidingDeque, position:int, refBase: char): void =
   let length = self.deq.len
+  sanityCheck(self.beginning, length, position)
 
-  assert position >= self.beginning, "The file is not sorted: " & $position & ' ' & $self.beginning
-  assert position <= (self.beginning + length), "Invalid position" & $position & $(self.beginning + length)
-  
   if position == (self.beginning + length):
     self.deq.addLast(newPositionData(length + self.beginning, refBase))
   
-
 
 proc recordMatch*(self: SlidingDeque, position: int,
                   base: char, quality: int, refBase: char): void =
@@ -78,16 +87,15 @@ proc recordMatch*(self: SlidingDeque, position: int,
 proc recordDeletion*(self: SlidingDeque, position: int,
                      bases: string, quality: int): void =
   ## Records deletion event information for a given position.
-  assert position < self.beginning + self.deq.len
+  sanityCheckNoExtend(self.beginning, self.deq.len, position)
   self.deq[position - self.beginning].addDeletion(bases, quality)
 
 
 proc recordInsertion*(self: SlidingDeque, position: int,
                       bases: string, quality: int): void =
   ## Records insertion event infromation for a given position.
-  assert position < self.beginning + self.deq.len
+  sanityCheckNoExtend(self.beginning, self.deq.len, position)
   self.deq[position - self.beginning].addInsertion(bases, quality)
-
 
 
 proc flushAll*(self: SlidingDeque): int =
@@ -100,7 +108,7 @@ proc flushAll*(self: SlidingDeque): int =
 
 proc flushUpTo*(self: SlidingDeque, position: int): int =
   ## Submits all elements with positions on the reference smaller than the given
-  ## argument to further processing. Enables the queue to slide. The method returns number
+  ## argument for further processing. Enables the queue to slide. The method returns number
   ## of submitted elements.
   if position < self.beginning - 1:
     raise newException(ValueError, "Flush index lower than beginning.")
@@ -114,23 +122,11 @@ proc flushUpTo*(self: SlidingDeque, position: int): int =
     self.beginning = position
     return result
 
-  while self.beginning < position: # -1 because of the insertions on read starts
-    self.collector.submit(self.deq.popFirst())
+  while self.beginning < position:
+    self.submit(self.deq.popFirst())
     self.beginning.inc
     result.inc
 
-
-
-proc getIStorage*(self: SlidingDeque): IStorage=
-  # I need to decide whehter to use this or delete it. It is currently useless.
-  return (
-        record: proc(position: int,value: string,refBase: char): void =
-          self.recordDeletion(position, value,50), #todo WRONG!!!
-        flushUpTo: proc(position: int): int =
-          self.flushUpTo(position),
-        flushAll: proc(): int  =
-          self.flushAll()
-       )
 
 # when isMainModule:
   # block: # test constructor
@@ -279,9 +275,4 @@ proc getIStorage*(self: SlidingDeque): IStorage=
   #       echo pair[0][]
   #       echo pair[1]
   #       doAssert pair[0].events == pair[1], $pair[0].events & " " & $pair[1]
-
-
-
-
-
 
