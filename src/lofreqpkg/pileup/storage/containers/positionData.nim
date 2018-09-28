@@ -1,16 +1,16 @@
 ## The module provides an implementation of a `PositionData` and its operations.
 ## 'PositionData' serves as a main data structure used in performing the pileup.
 ## It keeps all the information for a single position on the reference
-import eventData
+import qualityHistogram 
 import json
 
 type
   PositionData* = ref object
     referenceIndex*: int
     referenceBase*: char
-    matches: EventData[char]
-    deletions: EventData[string]
-    insertions: EventData[string]
+    matches: QualityHistogram[char]
+    deletions: QualityHistogram[string]
+    insertions: QualityHistogram[string]
     # chromosome - injected after pileup is done in order to save space and time
 
 
@@ -21,9 +21,9 @@ proc newPositionData*(referenceIndex: int, referenceBase: char) : PositionData =
   PositionData(
     referenceIndex: referenceIndex,
     referenceBase: referenceBase,
-    matches: initEventData[char](),
-    insertions: initEventData[string](),
-    deletions: initEventData[string]()
+    matches: initQualityHistogram[char](),
+    insertions: initQualityHistogram[string](),
+    deletions: initQualityHistogram[string]()
   )
 
 

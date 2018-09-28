@@ -26,10 +26,11 @@ proc pileup*(bamFname: string, faFname: string) =
     var records = newRecordFilter(bam, name)
     var reference = fai.loadSequence(name)
     
-    var injectChromosome = chromosomeInjector(name)
+    var injectChromosome = getJsonPropertyInjector("chromosome", name)
     var handler = toJson
-      .then(injectChromosome)
-      .thenDo(printOutput)
+      .thenDo(injectChromosome)
+      .then(print)
+
     var storage = newSlidingDeque(200, handler)
     
     pileup(records, reference, storage)

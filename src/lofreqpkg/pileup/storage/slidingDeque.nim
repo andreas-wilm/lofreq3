@@ -5,22 +5,32 @@
 ## finds itself behind the 'scan line', no need to wait for the whole pileup 
 ## to finish.
 import deques
-import containers/eventData
 import containers/positionData
 import math
-import tables
-import ../interfaces/pSubmit
+import ../util
+
+
+type DataToVoid =  proc(data: PositionData): void
+type DataToType[T] =  proc(data: PositionData): T
+
 
 # NOTE: The quue does not really need to be double ended, but the 'Queue' module
 # is deprecated.
 type SlidingDeque* = ref object
   deq: Deque[PositionData]
-  submit: PSubmit[PositionData]
+  submit: DataToVoid
   initialSize: int # estimated maximum size of the double ended queue
   beginning: int
 
 
-proc newSlidingDeque*(initialSize: int, submit: PSubmit[PositionData]): SlidingDeque =
+proc newSlidingDeque*(initialSize: int, submit: DataToType): SlidingDeque =
+  ## Constructs a new SlidingDeque object. 
+  ## The paramater 'submit' is a function expected to perform all furhter processing.
+  ## There is an optional initial size argument for the queue.
+  newSlidingDeque(initialSize, submit.done())
+
+
+proc newSlidingDeque*(initialSize: int, submit: DataToVoid): SlidingDeque =
   ## Constructs a new SlidingDeque object. 
   ## The paramater 'submit' is a function expected to perform all furhter processing.
   ## There is an optional initial size argument for the queue.
@@ -69,7 +79,8 @@ proc sanityCheckNoExtend(beginning, length, position: int): void =
   assert position < beginning + length
 
 
-proc extendStorage(self: SlidingDeque, position:int, refBase: char): void =
+proc ensureStorage(self: SlidingDeque, position:int, refBase: char): void =
+  ## Performs sanity checks before and, if needed, extends the storage.
   let length = self.deq.len
   sanityCheck(self.beginning, length, position)
 
@@ -79,8 +90,8 @@ proc extendStorage(self: SlidingDeque, position:int, refBase: char): void =
 
 proc recordMatch*(self: SlidingDeque, position: int,
                   base: char, quality: int, refBase: char): void =
-  ## Records match event information on for a given position
-  self.extendStorage(position, refBase)
+  ## Records match event information on for a given position.
+  self.ensureStorage(position, refBase)
   self.deq[position - self.beginning].addMatch(base, quality)
     
 
@@ -101,7 +112,7 @@ proc recordInsertion*(self: SlidingDeque, position: int,
 proc flushAll*(self: SlidingDeque): int =
   ## Submits all elements currently contained in the queue 
   ## for further processing. The method returns the number of
-  ## submitted elements
+  ## submitted elements.
   result = self.deq.len
   self.resetDeq(0)
 
@@ -116,10 +127,10 @@ proc flushUpTo*(self: SlidingDeque, position: int): int =
   # if a new start position is larger than all positions contained in
   # the deque, instead of emptying it manually, we can submit it and
   # make a new one  
-  if position >= self.beginning + self.deq.len:
+  if position >= self.beginning + self.deq.len: # simplify, this is an overkill
     result = self.deq.len
     self.resetDeq(position)
-    self.beginning = position
+    self.beginning = position # remove this
     return result
 
   while self.beginning < position:

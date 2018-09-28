@@ -9,7 +9,7 @@ proc newJsonCollector*[TNext](next: TNext): JsonCollector[TNext] =
   JsonCollector[TNext](next: next)
 
 proc submit*[TData](self: JsonCollector, data: TData): void =
-  self.next.submit2(%data)
+  self.next.submit(%data)
 
 proc getICollector*(self: JsonCollector): ICollector =
   return (
