@@ -8,6 +8,6 @@ proc newChromosomeInjector*[TNext](next: TNext,
                                    chromosome: string): ChromosomeInjector[TNext] =
   ChromosomeInjector[TNext](chromosome: chromosome, next: next)
 
-proc submit2*(self: ChromosomeInjector, data: JsonNode) : void =
+proc submit*(self: ChromosomeInjector, data: JsonNode) : void =
   data["chromosome"] = %self.chromosome
-  self.next.submit3(data)
+  self.next.submit(data)
