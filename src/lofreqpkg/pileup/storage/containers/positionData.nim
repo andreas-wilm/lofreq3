@@ -14,7 +14,7 @@ type
     # chromosome - injected after pileup is done in order to save space and time
 
 
-proc newPositionData*(referenceIndex: int, referenceBase: char) : PositionData =
+proc newPositionData*(referenceIndex: int, referenceBase: char) : PositionData {.inline.} =
   ## Constructs a new PositionData object keeping the data for the given position
   ## on the reference. The second argument should provide the base appearing on the said
   ## position.
@@ -27,7 +27,7 @@ proc newPositionData*(referenceIndex: int, referenceBase: char) : PositionData =
   )
 
 
-proc addMatch*(self: var PositionData, base: char, quality: int) =
+proc addMatch*(self: var PositionData, base: char, quality: int) {.inline.} =
   ## Accounts for a match on the position represented by this object.
   ## A match can either be a true match (same base as the reference)
   ## or a mismatch (base different from the reference) as long as the 
@@ -35,21 +35,21 @@ proc addMatch*(self: var PositionData, base: char, quality: int) =
   self.matches.add(base, quality)
 
 
-proc addInsertion*(self: var PositionData, bases: string, quality: int) =
+proc addInsertion*(self: var PositionData, bases: string, quality: int) {.inline.} =
   ## Accounts for an insertion on the position represented by this object.
   ## An insertion consists of one or more bases not present on the reference.
   ## It is defined by its value (one or more bases) and its quality.
   self.insertions.add(bases, quality)
 
 
-proc addDeletion*(self: var PositionData, bases: string, quality: int) =
+proc addDeletion*(self: var PositionData, bases: string, quality: int) {.inline.} =
   ## Accounts for a deletion the position represented by this object.
   ## A Deletion  consists of one or more missing bases (wrt. the reference).
   ## It is defined by its value (one or more bases) and its quality.
   self.deletions.add(bases, quality)
 
 
-proc `%`*(self: PositionData): JsonNode =
+proc `%`*(self: PositionData): JsonNode {.inline.} =
   result = %{
     "referenceIndex": %self.referenceIndex,
     "referenceBase": %($self.referenceBase),

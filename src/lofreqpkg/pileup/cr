@@ -1,4 +1,4 @@
 #!/bin/bash
 name="$1"
 shift 
-./compile $name && bin/$name "$@"
+./c $name.nim && bin/$name "$@"

@@ -23,14 +23,14 @@ type SlidingDeque* = ref object
   beginning: int
 
 
-proc newSlidingDeque*(initialSize: int, submit: DataToType): SlidingDeque =
+proc newSlidingDeque*(initialSize: int, submit: DataToType): SlidingDeque {.inline.} =
   ## Constructs a new SlidingDeque object. 
   ## The paramater 'submit' is a function expected to perform all furhter processing.
   ## There is an optional initial size argument for the queue.
   newSlidingDeque(initialSize, submit.done())
 
 
-proc newSlidingDeque*(initialSize: int, submit: DataToVoid): SlidingDeque =
+proc newSlidingDeque*(initialSize: int, submit: DataToVoid): SlidingDeque {.inline.} =
   ## Constructs a new SlidingDeque object. 
   ## The paramater 'submit' is a function expected to perform all furhter processing.
   ## There is an optional initial size argument for the queue.
@@ -43,7 +43,7 @@ proc newSlidingDeque*(initialSize: int, submit: DataToVoid): SlidingDeque =
   )
 
 
-proc submitDeq(self: SlidingDeque, deq: var Deque[PositionData]): void =
+proc submitDeq(self: SlidingDeque, deq: var Deque[PositionData]): void {.inline.} =
   # todo implement
   # asyncronous function (probably outside of this module)
   # Submits the current deque to another thread for furhter processing
@@ -51,35 +51,35 @@ proc submitDeq(self: SlidingDeque, deq: var Deque[PositionData]): void =
     self.submit(element)
 
 
-proc resetDeq(self: SlidingDeque, beginning: int) =
+proc resetDeq(self: SlidingDeque, beginning: int): void {.inline.} =
   # Submits all elements from the current deque for furhter processing.
   self.submitDeq(self.deq)
   self.deq = initDeque[PositionData](self.initialSize)
   self.beginning = beginning
 
 
-proc `[]`(self: SlidingDeque, position:int): PositionData =
+proc `[]`(self: SlidingDeque, position:int): PositionData {.inline.} =
   ## Access a position in the deque, for testing purposes.
   if position < self.beginning or position >= self.beginning + self.deq.len:
     raise newException(ValueError, "Illegal position")
   return self.deq[position - self.beginning]
 
 
-proc sanityCheck(beginning, length, position: int) : void =
+proc sanityCheck(beginning, length, position: int) : void {.inline.} =
   ## Checks whether the given position is valid based on the
   ## current deque beginning and length. Allows the deque to be extended. 
   assert position >= beginning, "The file is not sorted: " & $position & ' ' & $beginning
   assert position <= (beginning + length), "Invalid position" & $position & $(beginning + length)
   
 
-proc sanityCheckNoExtend(beginning, length, position: int): void =
+proc sanityCheckNoExtend(beginning, length, position: int): void {.inline.} =
   ## Checks whether the given position is valid based on the
   ## current deque beginning and length. Does not allow the deque to be extended.
   assert position >= beginning, "The file is not sorted: " & $position & ' ' & $beginning
   assert position < beginning + length
 
 
-proc ensureStorage(self: SlidingDeque, position:int, refBase: char): void =
+proc ensureStorage(self: SlidingDeque, position:int, refBase: char): void {.inline.} =
   ## Performs sanity checks before and, if needed, extends the storage.
   let length = self.deq.len
   sanityCheck(self.beginning, length, position)
@@ -89,27 +89,27 @@ proc ensureStorage(self: SlidingDeque, position:int, refBase: char): void =
   
 
 proc recordMatch*(self: SlidingDeque, position: int,
-                  base: char, quality: int, refBase: char): void =
+                  base: char, quality: int, refBase: char): void {.inline.} =
   ## Records match event information on for a given position.
   self.ensureStorage(position, refBase)
   self.deq[position - self.beginning].addMatch(base, quality)
     
 
 proc recordDeletion*(self: SlidingDeque, position: int,
-                     bases: string, quality: int): void =
+                     bases: string, quality: int): void {.inline.} =
   ## Records deletion event information for a given position.
   sanityCheckNoExtend(self.beginning, self.deq.len, position)
   self.deq[position - self.beginning].addDeletion(bases, quality)
 
 
 proc recordInsertion*(self: SlidingDeque, position: int,
-                      bases: string, quality: int): void =
+                      bases: string, quality: int): void {.inline.} =
   ## Records insertion event infromation for a given position.
   sanityCheckNoExtend(self.beginning, self.deq.len, position)
   self.deq[position - self.beginning].addInsertion(bases, quality)
 
 
-proc flushAll*(self: SlidingDeque): int =
+proc flushAll*(self: SlidingDeque): int {.inline.} =
   ## Submits all elements currently contained in the queue 
   ## for further processing. The method returns the number of
   ## submitted elements.
@@ -117,7 +117,7 @@ proc flushAll*(self: SlidingDeque): int =
   self.resetDeq(0)
 
 
-proc flushUpTo*(self: SlidingDeque, position: int): int =
+proc flushUpTo*(self: SlidingDeque, position: int): int {.inline.} =
   ## Submits all elements with positions on the reference smaller than the given
   ## argument for further processing. Enables the queue to slide. The method returns number
   ## of submitted elements.

@@ -1,6 +1,7 @@
 import os
 import interfaces/iSequence
 import storage/slidingDeque
+import processor
 import algorithm
 import hts
 import recordFilter
@@ -26,5 +27,5 @@ for chromosome in targets(bam.hdr):
     .then(print)
 
   var storage = newSlidingDeque(200, handler)
-  
-  pileup(records, reference, storage)
+  var processor = newProcessor(storage)
+  pileup(records, reference, processor)
