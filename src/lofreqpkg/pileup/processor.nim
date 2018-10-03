@@ -4,7 +4,7 @@ import strutils
 # placeholders until we find a way to record true qualities
 const DEFAULT_DELETION_QUALITY = 40
 const DEFAULT_INSERTION_QUALITY = 40
-const DEFAULT_BLANK_QUALITY = 40
+const DEFAULT_BLANK_QUALITY = -1 
 const DEFAULT_BLANK_SYMBOL = '*'
 
 type TQualityProc = proc (r: Record, i: int): int 
@@ -22,9 +22,9 @@ proc newProcessor*[TStorage](storage: TStorage,
                              deletionQuality: TQualityProc
                             ): Processor[TStorage] {.inline.} =
   Processor[TStorage](storage: storage,
-                      matchQuality: matchQuality,
-                      insertionQuality: insertionQuality,
-                      deletionQuality: deletionQuality
+                      matchQualityAt: matchQuality,
+                      insertionQualityAt: insertionQuality,
+                      deletionQualityAt: deletionQuality
                      )
 
 
