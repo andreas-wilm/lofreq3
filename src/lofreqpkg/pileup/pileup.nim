@@ -5,6 +5,7 @@ import os
 import hts
 import interfaces/iSequence
 import storage/slidingDeque
+import processor
 import recordFilter
 import algorithm
 import util
@@ -26,14 +27,9 @@ proc pileup*(bamFname: string, faFname: string) =
     var records = newRecordFilter(bam, name)
     var reference = fai.loadSequence(name)
     
-    var injectChromosome = getJsonPropertyInjector("chromosome", name)
-    var handler = toJson
-      .thenDo(injectChromosome)
-      .then(print)
-
-    var storage = newSlidingDeque(200, handler)
-    
-    pileup(records, reference, storage)
+    var storage = newSlidingDeque(200, name, toJson.then(print))
+    var processor = newProcessor(storage)
+    pileup(records, reference, processor)
 
 when isMainModule:
   import cligen

@@ -1,10 +1,10 @@
 import os
+import hts
 import interfaces/iSequence
 import storage/slidingDeque
 import processor
-import algorithm
-import hts
 import recordFilter
+import algorithm
 import util
 import postprocessing
 
