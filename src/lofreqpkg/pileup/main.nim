@@ -1,11 +1,22 @@
 import os
+import hts
 import interfaces/iSequence
 import storage/slidingDeque
-import algorithm
-import hts
+import processor
 import recordFilter
+import algorithm
 import util
 import postprocessing
+import ../utils.nim
+
+
+proc sampleQualAt(r: Record, i: int): int =
+  let be = qual2Prob(int(r.baseQualityAt(i)))
+  let me = qual2Prob(int(r.mappingQuality()))
+
+  let je = me + (1 - me) * be
+  result = prob2Qual(je)
+  
 
 var bam: Bam
 open(bam, paramStr(1), index=true)
@@ -20,11 +31,12 @@ for chromosome in targets(bam.hdr):
   var records = newRecordFilter(bam, name)
   var reference = fai.loadSequence(name)
   
-  var injectChromosome = getJsonPropertyInjector("chromosome", name)
   var handler = toJson
-    .thenDo(injectChromosome)
     .then(print)
 
-  var storage = newSlidingDeque(200, handler)
-  
-  pileup(records, reference, storage)
+  var storage = newSlidingDeque(200, name, handler)
+  var processor = newProcessor(storage,
+                               sampleQualAt,
+                               proc(r:Record, i: int): int = 46,
+                               proc(r:Record, i: int): int = 46)
+  pileup(records, reference, processor)

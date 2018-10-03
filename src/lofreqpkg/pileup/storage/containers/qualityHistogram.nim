@@ -3,26 +3,26 @@
 ## kind. Events are uniquely determined by their position on the reference,
 ## their kind, their value and their quality. Because different kinds of events have
 ## different types for their values, the object and its methods are parameterized.
-
 import tables
 import json
 
 type QualityHistogram*[T] = Table[T, CountTable[int]]
 
 
-func initQualityHistogram*[T](): QualityHistogram[T] =
+func initQualityHistogram*[T](): QualityHistogram[T] {.inline.} =
   ## Constructs a new QualityHistogram object. The type parameter T sets the
   ## type of event values.
   initTable[T, CountTable[int]]()
 
 
-proc add*[T](self: var QualityHistogram[T], value: T, quality: int): void =
+proc add*[T](self: var QualityHistogram[T], value: T,
+             quality: int): void {.inline.} =
   ## Accounts for a event with a given value and quality.
   discard self.hasKeyOrPut(value, initCountTable[int]())
   self[value].inc(quality)
 
 
-proc `%`*[T](table: var QualityHistogram[T]): JsonNode =
+proc `%`*[T](table: var QualityHistogram[T]): JsonNode {.inline.} =
   result = newJObject()
   
   var buff = initOrderedTable[string, JsonNode]()
@@ -32,7 +32,7 @@ proc `%`*[T](table: var QualityHistogram[T]): JsonNode =
   result.fields = buff
 
 
-proc `%`*(table: CountTable[int]): JsonNode =
+proc `%`*(table: CountTable[int]): JsonNode {.inline.} =
   result = newJObject()
   
   var buff = initOrderedTable[string, JsonNode]()
