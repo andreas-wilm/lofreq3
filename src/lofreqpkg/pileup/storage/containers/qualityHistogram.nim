@@ -3,7 +3,6 @@
 ## kind. Events are uniquely determined by their position on the reference,
 ## their kind, their value and their quality. Because different kinds of events have
 ## different types for their values, the object and its methods are parameterized.
-
 import tables
 import json
 
@@ -16,7 +15,8 @@ func initQualityHistogram*[T](): QualityHistogram[T] {.inline.} =
   initTable[T, CountTable[int]]()
 
 
-proc add*[T](self: var QualityHistogram[T], value: T, quality: int): void {.inline.} =
+proc add*[T](self: var QualityHistogram[T], value: T,
+             quality: int): void {.inline.} =
   ## Accounts for a event with a given value and quality.
   discard self.hasKeyOrPut(value, initCountTable[int]())
   self[value].inc(quality)

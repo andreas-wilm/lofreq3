@@ -25,26 +25,26 @@ proc processEvent[TSequence, TProcessor](event: CigarElement, processor: var TPr
     raise newException(ValueError, "Invalid operation: " & $operation)
 
   if operation == soft_clip:
-    # a soft clip is not reported but advaces the position on the read
+    # a soft clip is not processed but advaces the position on the read
     return (readOffset + event.len, refOffset)
   
   let consumes = event.consumes()
   
   if consumes.query and consumes.reference:
-    # mutual, report all matches
-    processor.reportMatches(readOffset, refOffset, event.len,
+    # mutual, process all matches
+    processor.processMatches(readOffset, refOffset, event.len,
                   read, reference)
     return (readOffset + event.len, refOffset + event.len)
 
   if consumes.reference:
-    # reference only, report deletion
-    processor.reportDeletion(readOffset, refOffset, event.len,
+    # reference only, process deletion
+    processor.processDeletion(readOffset, refOffset, event.len,
                    read, reference)
     return (readOffset, refOffset + event.len)
 
   if consumes.query:
-    # read only, report insertion
-    processor.reportInsertion(readOffset, refOffset, event.len,
+    # read only, process insertion
+    processor.processInsertion(readOffset, refOffset, event.len,
                     read, reference)
     return (readOffset + event.len, refOffset)
   
@@ -60,9 +60,10 @@ proc valid(cigar: Cigar): bool {.inline.} =
 
     
 proc pileup*[TSequence, TRecordIterable, TProcessor](reads: TRecordIterable,
-                                                 reference: TSequence,
-                                                 processor: var TProcessor): void {.inline.} =
-  ## Performs a pileup over all reads provided by the read iterable parameter and reports
+                                                     reference: TSequence,
+                                                     processor: var TProcessor
+                                                    ): void {.inline.} =
+  ## Performs a pileup over all reads provided by the read iterable parameter and processs
   ## the results to the given processor object.
   ## The parameter `reads` is an iterable (has an `items` method) yielding all
   ## reads which should be piled up. It must yield objects of type 'Bam.Record'.

@@ -21,11 +21,9 @@ for chromosome in targets(bam.hdr):
   var records = newRecordFilter(bam, name)
   var reference = fai.loadSequence(name)
   
-  var injectChromosome = getJsonPropertyInjector("chromosome", name)
   var handler = toJson
-    .thenDo(injectChromosome)
     .then(print)
 
-  var storage = newSlidingDeque(200, handler)
+  var storage = newSlidingDeque(200, name, handler)
   var processor = newProcessor(storage)
   pileup(records, reference, processor)
