@@ -1,5 +1,12 @@
-## The module implements a pileup algorithm performed over a single chromosome and
-## its reads.
+## The module implements a pileup algorithm performed over a single chromosome
+## and its reads. It serves as a template and defines only the basic procedure
+## for iterating over the CIGAR strings of BAM records. The processing itself
+## is defined by an outside object. 
+##
+## - Author: Filip Sodić <filip.sodic@gmail.com>
+## - License: The MIT License
+
+
 import hts
 
 proc allowed(operation: CigarOp): bool {.inline.} =
@@ -10,15 +17,17 @@ proc allowed(operation: CigarOp): bool {.inline.} =
     else: true
 
 
-proc processEvent[TSequence, TProcessor](event: CigarElement, processor: var TProcessor,
+proc processEvent[TSequence, TProcessor](event: CigarElement,
+                  processor: var TProcessor,
                   read: Record, reference: TSequence,
                   readOffset: int, refOffset: int): (int, int) {.inline.} =
-  ## Processes one event (cigar element) on the read and returns the updated offset 
-  ## The event is described by the first argument, 'event'. The parameter 'processor'
-  ## provides a reference to the processor used to record the events. 'read' and 'reference' are the
-  ## read and the reference sequences. 'readOffset' and 'refOffset' mark the current position 
-  ## on the read and the reference respectively. After processing the event, the function
-  ## returns new offsets as a tuple.
+  ## Processes one event (cigar element) on the read and returns the updated
+  ## offset. The event is described by the first argument, 'event'.
+  ## The parameter 'processor' provides a reference to the processor used to
+  ## handle the events. 'read' and 'reference' are the read and the reference
+  ## sequences. 'readOffset' and 'refOffset' mark the current position on the 
+  ## read and the reference respectively. After processing the event, the 
+  ## function returns the new offsets as a tuple.
   let operation = event.op
   
   if not operation.allowed:
@@ -47,8 +56,9 @@ proc processEvent[TSequence, TProcessor](event: CigarElement, processor: var TPr
     processor.processInsertion(readOffset, refOffset, event.len,
                     read, reference)
     return (readOffset + event.len, refOffset)
-  
+
   raise newException(ValueError, "Operation does not consume anything.")
+
 
 proc valid(cigar: Cigar): bool {.inline.} =
   ## Tests whether a CIGAR is valid.
@@ -63,13 +73,15 @@ proc pileup*[TSequence, TRecordIterable, TProcessor](reads: TRecordIterable,
                                                      reference: TSequence,
                                                      processor: var TProcessor
                                                     ): void {.inline.} =
-  ## Performs a pileup over all reads provided by the read iterable parameter and processs
-  ## the results to the given processor object.
+  ## Performs a pileup over all reads provided by the read iterable parameter 
+  ## and the passes all relevant information to the provided 'processor' object
+  ## which is in charge of processing the operations.
   ## The parameter `reads` is an iterable (has an `items` method) yielding all
-  ## reads which should be piled up. It must yield objects of type 'Bam.Record'.
-  ## The parameter `reference` is an interface for accessing the reference sequence.
-  ## The parameter `processor` is an implementation of a processor object used in
-  ## the pileup.
+  ## reads which to be piled up. It must yield objects of type 'Bam.Record'.
+  ## The parameter `reference` is an interface for accessing the reference
+  ## sequence.
+  ## The parameter `processor` must provide an implementation of the event 
+  ## processing methods. 
   for read in reads:
       let cigar = read.cigar
 
@@ -81,17 +93,16 @@ proc pileup*[TSequence, TRecordIterable, TProcessor](reads: TRecordIterable,
       var 
         readOffset = 0
         refOffset = read.start
-
-      # since the file is sorted and a read CANNOT begin with an insertion or deletion,
-      # we can safley flush any information related to
-      # indices smaller than the current start of the read
+      
+      # tell the processor that the new read is about to start
       processor.beginRead(read.start)
+      
+      # process all events on the read 
       for event in cigar:
         (readOffset, refOffset) =
           processEvent(event, processor, read, reference,
                        readOffset, refOffset)
 
-  # the pileup is done and all positions can be flushed      
+  # inform the processor that the pileup is done      
   processor.done()
-
 
