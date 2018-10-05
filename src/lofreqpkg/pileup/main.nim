@@ -5,7 +5,7 @@ import storage/slidingDeque
 import processor
 import recordFilter
 import algorithm
-import util
+import pipetools
 import postprocessing
 import ../utils.nim
 
@@ -34,7 +34,7 @@ for chromosome in targets(bam.hdr):
   var handler = toJson
     .then(print)
 
-  var storage = newSlidingDeque(200, name, handler)
+  var storage = newSlidingDeque(name, handler)
   var processor = newProcessor(storage,
                                sampleQualAt,
                                proc(r:Record, i: int): int = 46,

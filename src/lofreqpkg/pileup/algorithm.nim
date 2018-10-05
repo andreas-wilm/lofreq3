@@ -27,7 +27,7 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
   ## handle the events. 'read' and 'reference' are the read and the reference
   ## sequences. 'readOffset' and 'refOffset' mark the current position on the 
   ## read and the reference respectively. After processing the event, the 
-  ## function returns the new offsets as a tuple.
+  ## procedure returns the new offsets as a tuple.
   let operation = event.op
   
   if not operation.allowed:
