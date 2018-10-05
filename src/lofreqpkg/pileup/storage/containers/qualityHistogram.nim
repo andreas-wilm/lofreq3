@@ -1,11 +1,21 @@
-## The module provides an implementation of the 'QualityHistogram' object and its methods.
-## 'QualityHistogram' should be used to count all events on the same position and of the same
-## kind. Events are uniquely determined by their position on the reference,
-## their kind, their value and their quality. Because different kinds of events have
-## different types for their values, the object and its methods are parameterized.
+## The module provides an implementation of the 'QualityHistogram' object and
+## its methods. 'QualityHistogram' should be used to count all events on the
+## same position and of the same kind. Events are uniquely determined by their
+## position on the reference, their operation kind, their value, their quality
+## and their strand. This object and its procedures distinguish entries based
+## only on their values and qualities. Because different kinds of operations
+## have different types for their values, the object and its methods are
+## parameterized.
+##
+## - Author: Filip Sodić <filip.sodic@gmail.com>
+## - License: The MIT License
+
 import tables
 import json
 
+
+## Defines a 'QualityHistogram' type with a type parameter specifying the type
+## of the event value.
 type QualityHistogram*[T] = Table[T, CountTable[int]]
 
 
@@ -17,7 +27,7 @@ func initQualityHistogram*[T](): QualityHistogram[T] {.inline.} =
 
 proc add*[T](self: var QualityHistogram[T], value: T,
              quality: int): void {.inline.} =
-  ## Accounts for a event with a given value and quality.
+  ## Accounts for a event with the given value and the given quality.
   discard self.hasKeyOrPut(value, initCountTable[int]())
   self[value].inc(quality)
 

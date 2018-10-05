@@ -1,4 +1,9 @@
-## All the functions used in processing the data after all information is collected.
+## The module contains the procedures used in processing the data after all
+## information is collected.
+##
+## - Author: Filip Sodić <filip.sodic@gmail.com>
+## - License: The MIT License
+
 import storage/containers/positionData
 import json
 
@@ -6,7 +11,7 @@ import json
 proc getJsonPropertyInjector*[TValue](key: string,
                                       value: TValue
                                       ): (proc (data:JsonNode): void) =
-  ## Returns a function which takes a JsonNode and injects the given chromsome.
+  ## Returns a procedure which takes a JsonNode and injects the given chromsome.
   ## name into it.
   return proc (data: JsonNode): void =
     data[key] = %value

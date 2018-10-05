@@ -1,42 +1,57 @@
-## The module implements a storage mechanism for the :pileup data.
-## It uses a queue to organize 'PositionData' slots and it collects data
-## in a scanning left-to-right fasion. The storage can be flushed gradually. 
-## This means that data can be submitted for further processing as soon as it 
-## finds itself behind the 'scan line', no need to wait for the whole pileup 
-## to finish.
+## The module implements a storage mechanism for the ':pileup' data.  It uses a
+## queue to organize 'PositionData' slots and collects data in a scanning
+## left-to-right fasion. The storage can be flushed gradually.  This means that
+## collected data can be submitted for further processing as soon as it finds
+## itself behind the 'scan line', there is no need to wait for the whole pileup
+## to finish. The module also provides a '%' (toJson) procedure which converts
+## a 'PositionData' object into the standard LoFreq3 JSON format.
+##
+## - Author: Filip Sodić <filip.sodic@gmail.com>
+## - License: The MIT License
+
 import deques
 import containers/positionData
 import math
-import ../util
+import ../pipetools
 
 
+## Defines a type of the expected submit procedure. It should consume a
+## 'PositionData' object without returning a result (since the storage should
+## not be responsible for processing any data after it is collected.
 type DataToVoid =  proc(data: PositionData): void
+
+## Defines a type which can be wrapped into a submit procedure type
+## 'DataToVoid' with a discard operation.
 type DataToType[T] =  proc(data: PositionData): T
 
 
-# NOTE: The quue does not really need to be double ended, but the 'Queue' module
-# is deprecated.
+# NOTE: The quue does not really need to be double ended, but the 'Queue' 
+# module is deprecated.
 type SlidingDeque* = ref object
+  ## Defines a 'SlidingDeque' type and its relevant fields.
   deq: Deque[PositionData]
   submit: DataToVoid
   initialSize: int # estimated maximum size of the double ended queue
   beginning: int
   chromosome: string
+  # Having the chromosome as a a field on the storage object is certainly less 
+  # than ideal. I will probably change this to be injected later.
 
 
-proc newSlidingDeque*(initialSize: int, chromosome: string,
-                      submit: DataToType): SlidingDeque {.inline.} =
-  ## Constructs a new SlidingDeque object. 
-  ## The paramater 'submit' is a function expected to perform all furhter processing.
-  ## There is an optional initial size argument for the queue.
-  newSlidingDeque(initialSize, chromosome, submit.done())
+const DEFAULT_INITIAL_SIZE = 200
 
 
-proc newSlidingDeque*(initialSize: int, chromosome: string,
-                      submit: DataToVoid): SlidingDeque {.inline.} =
-  ## Constructs a new SlidingDeque object. 
-  ## The paramater 'submit' is a function expected to perform all furhter processing.
-  ## There is an optional initial size argument for the queue.
+proc newSlidingDeque*(chromosome: string, submit: DataToVoid,
+                      initialSize: int = DEFAULT_INITIAL_SIZE
+                     ): SlidingDeque {.inline.} =
+  ## Constructs a new 'SlidingDeque' object. 
+  ## The paramater 'submit' is a procedure expected to perform all furhter 
+  ## processing. This procedure must be a consumer (not returning anything) of
+  ## type 'DataToVoid'. If the user passes a mapping procedure of type 
+  ## 'DataToType', it matches against the second constructor which performs the
+  ## required wrapping.
+  ## There is an optional initial size argument for the queue for optimization
+  ## purposes.
   let adjustedSize = nextPowerOfTwo(initialSize)
   SlidingDeque(
     deq: initDeque[PositionData](adjustedSize),
@@ -47,11 +62,22 @@ proc newSlidingDeque*(initialSize: int, chromosome: string,
   )
 
 
+proc newSlidingDeque*(chromosome: string, submit: DataToType,
+                      initialSize: int = DEFAULT_INITIAL_SIZE
+                     ): SlidingDeque {.inline.} =
+  ## Constructs a new 'SlidingDeque' object. 
+  ## The paramater 'submit' is a procedure expected to perform all furhter 
+  ## processing.
+  ## This constructor accepts a procedure mapping a 'PositionData' object to
+  ## any desired type and wraps it into a 'DataToVoid' consumer. There is an
+  ## optional initial size argument for the queue for optimization purposes.
+  newSlidingDeque(initialSize, chromosome, submit.done())
+
+
 proc submitDeq(self: SlidingDeque,
                deq: var Deque[PositionData]): void {.inline.} =
-  # todo implement
-  # asyncronous function (probably outside of this module)
-  # Submits the current deque to another thread for furhter processing
+  # FIXME: implement asyncronous procedure (probably outside of this module)
+  # Submits the current deque for furhter processing
   for element in deq:
     self.submit(element)
 
@@ -72,7 +98,8 @@ proc `[]`(self: SlidingDeque, position:int): PositionData {.inline.} =
 
 proc sanityCheck(beginning, length, position: int) : void {.inline.} =
   ## Checks whether the given position is valid based on the
-  ## current deque beginning and length. Allows the deque to be extended. 
+  ## current deque beginning and length. Assumes that the deque is allowed
+  ## to be extended.
   assert position >= beginning, "The file is not sorted: " &
     $position & ' ' & $beginning
   assert position <= (beginning + length), "Invalid position" &
@@ -81,18 +108,22 @@ proc sanityCheck(beginning, length, position: int) : void {.inline.} =
 
 proc sanityCheckNoExtend(beginning, length, position: int): void {.inline.} =
   ## Checks whether the given position is valid based on the
-  ## current deque beginning and length. Does not allow the deque to be extended.
-  assert position >= beginning, "The file is not sorted: " & $position & ' ' & $beginning
+  ## current deque beginning and length. Assumes that the deque is not allowed 
+  ## to be extended.
+  assert position >= beginning, "The file is not sorted: " &
+    $position & ' ' & $beginning
   assert position < beginning + length
 
 
-proc ensureStorage(self: SlidingDeque, position:int, refBase: char): void {.inline.} =
+proc ensureStorage(self: SlidingDeque, position:int,
+                   refBase: char): void {.inline.} =
   ## Performs sanity checks before and, if needed, extends the storage.
   let length = self.deq.len
   sanityCheck(self.beginning, length, position)
 
   if position == (self.beginning + length):
-    self.deq.addLast(newPositionData(length + self.beginning, refBase, self.chromosome))
+    self.deq.addLast(newPositionData(length + self.beginning, refBase,
+                        self.chromosome))
   
 
 proc recordMatch*(self: SlidingDeque, position: int,
@@ -103,15 +134,18 @@ proc recordMatch*(self: SlidingDeque, position: int,
   self.deq[position - self.beginning].addMatch(base, quality, reversed)
     
 
-proc recordDeletion*(self: SlidingDeque, position: int,
-                     bases: string, quality: int, reversed: bool): void {.inline.} =
-  ## Records deletion event information for a given position.
+proc recordDeletion*(self: SlidingDeque, position: int, bases: string,
+                     quality: int, reversed: bool): void {.inline.} =
+  ## Records deletion event information for a given position. If using this
+  ## storage, all deletions should be reported on the base to their left. Thus,
+  ## this procedure does not allow the deque to be extended and assumes the
+  ## needed slot is already available.
   sanityCheckNoExtend(self.beginning, self.deq.len, position)
   self.deq[position - self.beginning].addDeletion(bases, quality, reversed)
 
 
-proc recordInsertion*(self: SlidingDeque, position: int,
-                      bases: string, quality: int, reversed: bool): void {.inline.} =
+proc recordInsertion*(self: SlidingDeque, position: int, bases: string,
+                      quality: int, reversed: bool): void {.inline.} =
   ## Records insertion event infromation for a given position.
   sanityCheckNoExtend(self.beginning, self.deq.len, position)
   self.deq[position - self.beginning].addInsertion(bases, quality, reversed)
@@ -126,19 +160,20 @@ proc flushAll*(self: SlidingDeque): int {.inline.} =
 
 
 proc flushUpTo*(self: SlidingDeque, position: int): int {.inline.} =
-  ## Submits all elements with positions on the reference smaller than the given
-  ## argument for further processing. Enables the queue to slide. The method returns number
-  ## of submitted elements.
+  ## Submits all elements with positions on the reference smaller than the 
+  ## given argument for further processing. Enables the queue to slide.
+  ## The method returns the number of submitted elements.
   if position < self.beginning - 1:
     raise newException(ValueError, "Flush index lower than beginning.")
   
   # if a new start position is larger than all positions contained in
   # the deque, instead of emptying it manually, we can submit it and
   # make a new one  
-  if position >= self.beginning + self.deq.len: # simplify, this is an overkill
+  if position >= self.beginning + self.deq.len:
+    # FIXME: simplify once the
+    # tests are stable, this is an overkill
     result = self.deq.len
     self.resetDeq(position)
-    self.beginning = position # remove this
     return result
 
   while self.beginning < position:
