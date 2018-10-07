@@ -11,6 +11,7 @@
 
 import json
 import qualityHistogram
+import tables
 
 
 type OperationData*[T] = object
@@ -18,15 +19,16 @@ type OperationData*[T] = object
   ## values and their qualities, as well as a total number of forward and
   ## reverse operations.
   histogram: QualityHistogram[T]
-  reverse: int
-  forward: int
+  reverse: CountTable[T]
+  forward: CountTable[T]
 
 
 proc initOperationData*[T](): OperationData[T] {.inline.} =
   ## Creates a new 'OperationData' object. All that it needs is the type for
   ## the operation values.
   OperationData[T](histogram: initQualityHistogram[T](),
-                   reverse: 0, forward: 0)
+                   reverse: initCountTable[T](),
+                   forward: initCountTable[T]())
 
 
 proc add*[T](self: var OperationData, bases: T, quality: int,
@@ -38,9 +40,9 @@ proc add*[T](self: var OperationData, bases: T, quality: int,
   ## quality. The strand information is counted separately.
   self.histogram.add(bases, quality)
   if reverse:
-    self.reverse.inc
+    self.reverse.inc(bases)
   else:
-    self.forward.inc
+    self.forward.inc(bases)
 
 
 # If I just make one generic method, it doesn't work so I had to 'pattern
@@ -48,14 +50,14 @@ proc add*[T](self: var OperationData, bases: T, quality: int,
 proc `%`*(self: var OperationData[char]): JsonNode {.inline.} =
   %{
     "histogram": %self.histogram,
-    "reverse": %self.reverse,
-    "forward": %self.forward
+    #"reverse": %self.reverse,
+    #"forward": %self.forward
   }
 
 
 proc `%`*(self: var OperationData[string]): JsonNode {.inline.} =
   %{
     "histogram": %self.histogram,
-    "reverse": %self.reverse,
-    "forward": %self.forward
+    #"reverse": %self.reverse,
+    #"forward": %self.forward
   }
