@@ -6,17 +6,32 @@
 
 import tables
 import json
-import parseutils
+#import parseutils
 import utils
 import math
+import strutils
 
 
-## brief pileup object parsed from json
-type PlpObj = object
-  sq: string
-  pos: Natural
-  refStr: string
-  qHist: Table[string, Table[int, int]]
+# decided against reusing pileup/storage/container since
+# json is the glue here
+type OperationData* = object
+  ## The 'OperationData' type. It makes and provides a histogram on operation
+  ## values and their qualities, as well as a total number of forward and
+  ## reverse operations.
+  histogram: Table[string, CountTable[int]]
+  reverse: int
+  forward: int
+
+
+type PositionData* = object
+    ## The 'PositionData' object keeping all information concerning one parti-
+    ## cular position on the reference.
+    referenceIndex: int
+    referenceBase: char
+    chromosome: string
+    matches: OperationData
+    deletions: OperationData
+    insertions: OperationData
 
 
 ## brief Computes log(exp(logA) + exp(logB))
@@ -29,7 +44,7 @@ proc logSum(logA: float32, logB: float32): float32 =
   else:
     logB + ln(1.0 + exp(logA-logB))# FIXME use c log1p?
 
-    
+
 # FIXME add doc and refer to paper
 # FIXME: does it make sense to receive phred scores here instead?
 # less conversion and no need to check range then?
@@ -41,7 +56,7 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
   assert K > 0
   var probVec = newSeq[float64](K+1)
   var probVecPrev = newSeq[float64](K+1)
-    
+
   for f in errProbs:
     assert f>=0.0 and f<=1.0
   probVecPrev[0] = 0.0; # log(1.0)
@@ -63,10 +78,10 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
        log_1_pn = -float(high(int))# log_1_pn = log1p(-pn+DBL_EPSILON);
     else:
        log_1_pn = ln(1.0-pn)# /* 0.0 = log(1.0) # FIXME use c log1p?
-      
+
     if n < K:
       probVecPrev[n] = -float(high(int))
-      
+
     for k in countdown(min(n, K-1), 1):
       try:# FIXME why try?
         assert probVecPrev[k]<=0.0 and probVecPrev[k-1]<=0.0
@@ -74,15 +89,15 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
         raise
       probvec[k] = logSum(probVecPrev[k] + log_1_pn,
                            probVecPrev[k-1] + log_pn)
-      
+
     k = 0;
     assert probVecPrev[k] <= 0.0
     probvec[k] = probVecPrev[k] + log_1_pn
-    
+
     if n==K:
       probvec[K] = probVecPrev[K-1] + log_pn;
       # FIXME prune here as well?
-       
+
     elif n > K:
       try:# FIXME why try?
         assert probVecPrev[K] <= 0.0 and probVecPrev[K-1] <= 0.0 # FIXME
@@ -91,7 +106,7 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
       probvec[K] = logSum(probVecPrev[K], probVecPrev[K-1] + log_pn)
 
       let pvalue = exp(probvec[K]);
-          
+
       # FIXME store as phred scores instead?
       # Q = -10*log_10(e^X), where X=probvec[K]
       # remember, logB(x) = log_k(x)/log_k(b), i.e. log_10(Y) = log_e(Y)/log_e(10)
@@ -103,7 +118,7 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
       # 434.29448190325184
       # >>> -10 * X/log(10)
       # 434.2944819032518
-          
+
       # early exit
       if pvalue * bonf > sig:
         # explicitly limiting to valid range
@@ -114,40 +129,47 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
   return probVecPrev[0..K] # explicitly limiting to valid range
 
 
+proc parseOperationData(node: JsonNode): OperationData =
+  # FIXME parse reverse and forward counts here
+  # FIXME wrongly encoded in json
+  result.histogram = initTable[string, CountTable[int]]()
+
+  for event, qHist in node["histogram"].pairs():
+    discard result.histogram.hasKeyOrPut(event, initCountTable[int]())
+    for qual, count in qHist.pairs():
+      ##assert qual[0] == 'Q'
+      ## FIXME: string slicing and toInt simply doesn't work. Try: var
+      ## x = readLine(stdin); let q = parseInt(x[1..len(x)])
+      ## parseSaturatedNatural works but looks incredibly awkward
+      #discard parseSaturatedNatural(qual, q, start=1)
+      let q = parseInt($qual)
+      let c = count.getInt
+
+      assert result.histogram[event].hasKey(q) == false
+      result.histogram[event][q] = c
+  echo("DEBUG returning " & $result)
+
+
 ## brief parse pileup object from json
-proc parsePlpJson(fname: string): PlpObj =
-  result.qHist = initTable[string, Table[int, int]]()
-  
-  # let dataJson = parseJson(data)
-  let dataJson = parseFile(fname)
-  
+proc parsePlpJson(jsonString: string): PositionData =
+  let dataJson = parseJson(jsonString)
+  #let dataJson = parseFile(fname)
+
   # assert used in nim in action after parsing json string
   assert dataJson.kind == JObject
   # FIXME should we validate the keys before starting to parse?
   # what about extra keys for example. should they be ignored?
-  
-  result.sq = dataJson["sq"].getStr
-  result.pos =  dataJson["pos"].getInt
-  result.refStr = dataJson["ref"].getStr
-  
-  for event, qHist in dataJson["qhist"].pairs():
-    for qual, count in qHist.pairs():
-      var q = 0      
-      assert qual[0] == 'Q'
-      # FIXME: string slicing and toInt simply doesn't work. Try: var
-      # x = readLine(stdin); let q = parseInt(x[1..len(x)])
-      # parseSaturatedNatural works but looks incredibly awkward
-      discard parseSaturatedNatural(qual, q, start=1)
-      
-      let c = count.getInt
 
-      # FIXME allow for lowercase i.e bases mapping to rev strand.
-      # Best done elsewhere and not here
-      if not result.qHist.hasKey(event):
-        result.qHist[event] = initTable[int, int]()
-      assert result.qHist[event].hasKey(q) == false
-      result.qHist[event][q] = c
+  result.chromosome = dataJson["chromosome"].getStr
+  result.referenceIndex =  dataJson["referenceIndex"].getInt
+  result.referenceBase = dataJson["referenceBase"].getStr[0]
 
+  result.matches = parseOperationData(dataJson["matches"])
+  result.insertions = parseOperationData(dataJson["insertions"])
+  result.deletions = parseOperationData(dataJson["deletions"])
+
+  # FIXME do the same as above for ins and dels without code duplication
+  #
 
 ## brief create vcf header
 # FIXME check conformity. refFa and src likely missing since only known in plp
@@ -169,8 +191,9 @@ proc vcfHeader(src: string = "", refFa: string = ""): string =
     
 proc call*(plpFname: string) =
   echo vcfHeader()
-  var plp = parsePlpJson(plpFname)
-  echo("FIXME: compute pvalue for ", plp)
+  for line in lines(plpFname):
+    var plp = parsePlpJson(line)
+    echo("FIXME: compute pvalue for ", plp)
   
   
 when isMainModule:
