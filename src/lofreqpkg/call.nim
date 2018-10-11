@@ -12,27 +12,15 @@ import math
 import strutils
 
 
-# decided against reusing pileup/storage/container since
-# json is the glue here
-type OperationData* = object
-  ## The 'OperationData' type. It makes and provides a histogram on operation
-  ## values and their qualities, as well as a total number of forward and
-  ## reverse operations.
-  histogram: Table[string, CountTable[int]]
-  reverse: int
-  forward: int
-
-
 type PositionData* = object
     ## The 'PositionData' object keeping all information concerning one parti-
     ## cular position on the reference.
     referenceIndex: int
     referenceBase: char
     chromosome: string
-    matches: OperationData
-    deletions: OperationData
-    insertions: OperationData
-
+    matches: Table[string, CountTable[int]]
+    deletions: Table[string, CountTable[int]]
+    insertions: Table[string, CountTable[int]]
 
 ## brief Computes log(exp(logA) + exp(logB))
 ##
@@ -129,13 +117,13 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
   return probVecPrev[0..K] # explicitly limiting to valid range
 
 
-proc parseOperationData(node: JsonNode): OperationData =
+proc parseOperationData(node: JsonNode): Table[string, CountTable[int]] =
   # FIXME parse reverse and forward counts here
   # FIXME wrongly encoded in json
-  result.histogram = initTable[string, CountTable[int]]()
+  result = initTable[string, CountTable[int]]()
 
-  for event, qHist in node["histogram"].pairs():
-    discard result.histogram.hasKeyOrPut(event, initCountTable[int]())
+  for event, qHist in node.pairs():
+    discard result.hasKeyOrPut(event, initCountTable[int]())
     for qual, count in qHist.pairs():
       ##assert qual[0] == 'Q'
       ## FIXME: string slicing and toInt simply doesn't work. Try: var
@@ -145,8 +133,8 @@ proc parseOperationData(node: JsonNode): OperationData =
       let q = parseInt($qual)
       let c = count.getInt
 
-      assert result.histogram[event].hasKey(q) == false
-      result.histogram[event][q] = c
+      assert result[event].hasKey(q) == false
+      result[event][q] = c
   echo("DEBUG returning " & $result)
 
 
