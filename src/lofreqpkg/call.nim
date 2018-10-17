@@ -6,21 +6,24 @@
 
 import tables
 import json
-#import parseutils
 import utils
 import math
 import strutils
 
 
-type PositionData* = object
+type QualHist = Table[string, CountTable[int]]
+
+
+type PositionData = object
     ## The 'PositionData' object keeping all information concerning one parti-
     ## cular position on the reference.
-    referenceIndex: int
-    referenceBase: char
+    refIndex: int
+    refBase: char
     chromosome: string
-    matches: Table[string, CountTable[int]]
-    deletions: Table[string, CountTable[int]]
-    insertions: Table[string, CountTable[int]]
+    matches: QualHist
+    deletions: QualHist
+    insertions: QualHist
+
 
 ## brief Computes log(exp(logA) + exp(logB))
 ##
@@ -38,6 +41,7 @@ proc logSum(logA: float32, logB: float32): float32 =
 # less conversion and no need to check range then?
 # FIXME no need to make public except for tests
 # FIXME add pseudocode from paper here
+# previously pruned_calc_prob_dist()
 proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
                      K: Natural,
                      bonf = 1.0, sig = 1.0): seq[float] =
@@ -71,10 +75,7 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
       probVecPrev[n] = -float(high(int))
 
     for k in countdown(min(n, K-1), 1):
-      try:# FIXME why try?
-        assert probVecPrev[k]<=0.0 and probVecPrev[k-1]<=0.0
-      except AssertionError:
-        raise
+      assert probVecPrev[k]<=0.0 and probVecPrev[k-1]<=0.0
       probvec[k] = logSum(probVecPrev[k] + log_1_pn,
                            probVecPrev[k-1] + log_pn)
 
@@ -87,10 +88,7 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
       # FIXME prune here as well?
 
     elif n > K:
-      try:# FIXME why try?
-        assert probVecPrev[K] <= 0.0 and probVecPrev[K-1] <= 0.0 # FIXME
-      except AssertionError:
-        raise
+      assert probVecPrev[K] <= 0.0 and probVecPrev[K-1] <= 0.0
       probvec[K] = logSum(probVecPrev[K], probVecPrev[K-1] + log_pn)
 
       let pvalue = exp(probvec[K]);
@@ -117,7 +115,7 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
   return probVecPrev[0..K] # explicitly limiting to valid range
 
 
-proc parseOperationData(node: JsonNode): Table[string, CountTable[int]] =
+proc parseOperationData(node: JsonNode): QualHist =
   # FIXME parse reverse and forward counts here
   # FIXME wrongly encoded in json
   result = initTable[string, CountTable[int]]()
@@ -135,7 +133,7 @@ proc parseOperationData(node: JsonNode): Table[string, CountTable[int]] =
 
       assert result[event].hasKey(q) == false
       result[event][q] = c
-  echo("DEBUG returning " & $result)
+  #echo("DEBUG returning " & $result)
 
 
 ## brief parse pileup object from json
@@ -149,15 +147,13 @@ proc parsePlpJson(jsonString: string): PositionData =
   # what about extra keys for example. should they be ignored?
 
   result.chromosome = dataJson["chromosome"].getStr
-  result.referenceIndex =  dataJson["referenceIndex"].getInt
-  result.referenceBase = dataJson["referenceBase"].getStr[0]
+  result.refIndex =  dataJson["referenceIndex"].getInt
+  result.refBase = dataJson["referenceBase"].getStr[0].toUpperAscii()
 
   result.matches = parseOperationData(dataJson["matches"])
   result.insertions = parseOperationData(dataJson["insertions"])
   result.deletions = parseOperationData(dataJson["deletions"])
 
-  # FIXME do the same as above for ins and dels without code duplication
-  #
 
 ## brief create vcf header
 # FIXME check conformity. refFa and src likely missing since only known in plp
@@ -174,16 +170,52 @@ proc vcfHeader(src: string = "", refFa: string = ""): string =
 ##INFO=<ID=SB,Number=1,Type=Integer,Description="Phred-scaled strand bias at this position">
 ##INFO=<ID=DP4,Number=4,Type=Integer,Description="Counts for ref-forward bases, ref-reverse, alt-forward and alt-reverse bases">
 ##INFO=<ID=INDEL,Number=0,Type=Flag,Description="Indicates that the variant is an INDEL.">
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO""" 
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO"""
 
-    
+
 proc call*(plpFname: string) =
   echo vcfHeader()
   for line in lines(plpFname):
     var plp = parsePlpJson(line)
-    echo("FIXME: compute pvalue for ", plp)
-  
-  
+    var baseCounts = initTable[string, int]()
+    var baseCount = 0
+    var eProbs: seq[float] = @[]
+    var coverage = 0
+
+    # fill array of error probabilities and set baseCounts[] as well as coverage
+    for base, qhist in plp.matches.pairs():
+      baseCount = 0
+      for qual, count in qhist:
+        baseCount += count
+        let e = qual2prob(qual)
+        for i in countup(1, count):
+          eProbs.add(e)
+      let uBase = base.toUpperAscii
+      discard baseCounts.hasKeyOrPut(uBase, 0)
+      baseCounts[uBase] += baseCount
+      coverage += baseCount
+
+    doAssert len(eProbs) == coverage
+
+
+    # determine max number of alt counts. used for pruning in prunedProbDist()
+    var maxAltCount = 0
+    for b, c in pairs baseCounts:
+      doAssert len(b) == 1# FIXME how for indels?
+      if b[0] != plp.refBase and b[0] != 'N':
+        if c > maxAltCount:
+          maxAltCount = c
+
+    var pvalue = -1.0
+    var varQual = -1
+    if maxAltCount > 0:# chance to exit early if minAF is not met
+      # FIXME call by reference to safe memory
+      let probVec = prunedProbDist(eProbs, maxAltCount)
+      pvalue = exp(probVec[maxAltCount]);
+      varQual = prob2qual(pvalue)
+
+    echo plp.chromosome, " ", plp.refIndex, " ", plp.refBase, " ", coverage, " ", baseCounts, " ", maxAltCount, " ", len(eProbs), " ", pvalue, " ", varQual
+
 when isMainModule:
   import cligen
   dispatch(call)
