@@ -10,6 +10,8 @@ import utils
 import math
 import strutils
 
+import vcf
+
 
 type QualHist = Table[string, CountTable[int]]
 
@@ -155,26 +157,9 @@ proc parsePlpJson(jsonString: string): PositionData =
   result.deletions = parseOperationData(dataJson["deletions"])
 
 
-## brief create vcf header
-# FIXME check conformity. refFa and src likely missing since only known in plp
-proc vcfHeader(src: string = "", refFa: string = ""): string =
-  result = "##fileformat=VCFv4.2\n"
-  result = result & "##fileDate=" & dateStr() & "\n"
-  if len(src)>0:
-    result = result & "##source=" & src & "\n"
-  if len(refFa)>0:
-    result = result & "##reference=" & refFa & "\n"
-
-  result = result & """##INFO=<ID=DP,Number=1,Type=Integer,Description="Raw Depth">
-##INFO=<ID=AF,Number=1,Type=Float,Description="Allele Frequency">
-##INFO=<ID=SB,Number=1,Type=Integer,Description="Phred-scaled strand bias at this position">
-##INFO=<ID=DP4,Number=4,Type=Integer,Description="Counts for ref-forward bases, ref-reverse, alt-forward and alt-reverse bases">
-##INFO=<ID=INDEL,Number=0,Type=Flag,Description="Indicates that the variant is an INDEL.">
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO"""
-
-
-proc call*(plpFname: string) =
+proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
   echo vcfHeader()
+
   for line in lines(plpFname):
     var plp = parsePlpJson(line)
     var baseCounts = initTable[string, int]()
@@ -184,37 +169,75 @@ proc call*(plpFname: string) =
 
     # fill array of error probabilities and set baseCounts[] as well as coverage
     for base, qhist in plp.matches.pairs():
+      assert len(base) == 1# because SNP branch
       baseCount = 0
       for qual, count in qhist:
+        assert count>=0
         baseCount += count
-        let e = qual2prob(qual)
-        for i in countup(1, count):
-          eProbs.add(e)
+        # '*' are deletions, i.e. physical coverage (count) with q=-1 (ignore)
+        if base != "*":
+          assert qual>=0
+          let e = qual2prob(qual)
+          for i in countup(1, count):
+            eProbs.add(e)
       let uBase = base.toUpperAscii
       discard baseCounts.hasKeyOrPut(uBase, 0)
       baseCounts[uBase] += baseCount
       coverage += baseCount
+    assert len(eProbs) + baseCounts.getOrDefault("*") == coverage
 
-    doAssert len(eProbs) == coverage
-
-
-    # determine max number of alt counts. used for pruning in prunedProbDist()
+    # determine max number of alt snp counts. used for pruning in prunedProbDist()
     var maxAltCount = 0
     for b, c in pairs baseCounts:
-      doAssert len(b) == 1# FIXME how for indels?
-      if b[0] != plp.refBase and b[0] != 'N':
+      assert len(b) == 1
+      if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
         if c > maxAltCount:
           maxAltCount = c
 
     var pvalue = -1.0
     var varQual = -1
     if maxAltCount > 0:# chance to exit early if minAF is not met
-      # FIXME call by reference to safe memory
-      let probVec = prunedProbDist(eProbs, maxAltCount)
-      pvalue = exp(probVec[maxAltCount]);
-      varQual = prob2qual(pvalue)
-
-    echo plp.chromosome, " ", plp.refIndex, " ", plp.refBase, " ", coverage, " ", baseCounts, " ", maxAltCount, " ", len(eProbs), " ", pvalue, " ", varQual
+      # first pass loop: skip probDist calculation if below minAF
+      var passMinAF = false
+      for b, c in pairs baseCounts:
+        if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
+          let af = baseCounts[b]/coverage
+          if af >= minAF:
+            passMinAF = true
+            break
+      if passMinAF == true:
+        # FIXME call by reference to safe memory
+        let probVec = prunedProbDist(eProbs, maxAltCount)
+        for b, c in pairs baseCounts:
+          if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
+            # need to check minAF again, because checks above are for any base in this column
+            let af = baseCounts[b]/coverage
+            if af >= minAF:
+              let pvalue = exp(probVec[maxAltCount]);
+              let qual = prob2qual(pvalue)
+              if qual >= minQual:
+                var vcfVar: Variant
+                vcfVar.chrom = plp.chromosome
+                vcfVar.pos = plp.refIndex
+                vcfVar.id = "."
+                vcfVar.refBase = plp.refBase
+                vcfVar.alt = b
+                vcfVar.qual = qual
+                vcfVar.filter = "."
+                var info: InfoField
+                info.af = af
+                info.sb = 0# FIXME
+                var dp4: Dp4
+                dp4.refForward = 0#FIXME
+                dp4.refReverse = 0#FIXME
+                dp4.altForward = 0#FIXME
+                dp4.altReverse = 0#FIXME
+                info.dp4 = dp4
+                info.indel = false
+                vcfVar.info = info
+                echo "DEBUG: ", plp.chromosome, " ", plp.refIndex, " ", plp.refBase, " ", coverage, " ", baseCounts, " ", maxAltCount, " ", len(eProbs), " ", pvalue, " ", varQual
+                echo $vcfVar
+  
 
 when isMainModule:
   import cligen

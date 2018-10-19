@@ -4,3 +4,4 @@ lofreq
 .Rhistory
 tests/all
 tmp/
+*.swp
