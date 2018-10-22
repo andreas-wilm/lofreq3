@@ -38,6 +38,15 @@ proc logSum(logA: float32, logB: float32): float32 =
     logB + ln(1.0 + exp(logA-logB))# FIXME use c log1p?
 
 
+## brief Computes sum of probvec values (log space) starting from (including)
+## tail_startindex to (excluding) probvec_len
+##
+proc probvecTailSum(probVec: openArray[float], tailStartIndex: int): float =
+  result = probVec[tailStartIndex];
+  for i in tailStartIndex+1..<len(probVec):
+    result = logSum(result, probVec[i]);
+
+
 # FIXME add doc and refer to paper
 # FIXME: does it make sense to receive phred scores here instead?
 # less conversion and no need to check range then?
@@ -162,42 +171,42 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
 
   for line in lines(plpFname):
     var plp = parsePlpJson(line)
-    var baseCounts = initTable[string, int]()
-    var baseCount = 0
+    var baseCountsStranded = initCountTable[string]()# strand aware counts
+    var baseCounts = initCountTable[string]()
     var eProbs: seq[float] = @[]
     var coverage = 0
 
-    # fill array of error probabilities and set baseCounts[] as well as coverage
+    # fill array of error probabilities, set baseCounts[] and coverage.
+    # note that base's strand is indicated by its case.
     for base, qhist in plp.matches.pairs():
+      var thisBaseCount = 0
       assert len(base) == 1# because SNP branch
-      baseCount = 0
       for qual, count in qhist:
         assert count>=0
-        baseCount += count
+        thisBaseCount += count
         # '*' are deletions, i.e. physical coverage (count) with q=-1 (ignore)
         if base != "*":
-          assert qual>=0
+          assert qual>=0# "*" have q=-1
           let e = qual2prob(qual)
           for i in countup(1, count):
             eProbs.add(e)
+      coverage += thisBaseCount
+
+      #discard baseCountsStranded.hasKeyOrPut(base, 0)
+      baseCountsStranded.inc(base, thisBaseCount)
+
       let uBase = base.toUpperAscii
-      discard baseCounts.hasKeyOrPut(uBase, 0)
-      baseCounts[uBase] += baseCount
-      coverage += baseCount
+      #discard baseCounts.hasKeyOrPut(uBase, 0)
+      baseCounts.inc(uBase, thisBaseCount)
+
     assert len(eProbs) + baseCounts.getOrDefault("*") == coverage
 
-    # determine max number of alt snp counts. used for pruning in prunedProbDist()
-    var maxAltCount = 0
-    for b, c in pairs baseCounts:
-      assert len(b) == 1
-      if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
-        if c > maxAltCount:
-          maxAltCount = c
+    # determine max number of alt snp counts. used for pruning in prunedProbDist().
+    let (maxAltBase, maxAltCount) = largest(baseCounts)
 
-    var pvalue = -1.0
-    var varQual = -1
     if maxAltCount > 0:# chance to exit early if minAF is not met
       # first pass loop: skip probDist calculation if below minAF
+      # for speedup
       var passMinAF = false
       for b, c in pairs baseCounts:
         if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
@@ -208,36 +217,46 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
       if passMinAF == true:
         # FIXME call by reference to safe memory
         let probVec = prunedProbDist(eProbs, maxAltCount)
-        for b, c in pairs baseCounts:
-          if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
-            # need to check minAF again, because checks above are for any base in this column
-            let af = baseCounts[b]/coverage
+        var prevAltCount = high(int)# paranoid check to ensure sorting of pairs and early exit
+        sort(baseCounts)
+        for altBase, altCount in pairs baseCounts:
+          if altBase[0] != plp.refBase and altBase[0] != 'N' and altBase[0] != '*':
+            assert altCount <= prevAltCount
+            prevAltCount = altCount
+            # need to check minAF again, because checks above were for any base in this column
+            let af = altCount/coverage
             if af >= minAF:
-              let pvalue = exp(probVec[maxAltCount]);
+              #let pvalue = exp(probVec[altCount]);
+              let pvalue = exp(probvecTailSum(probVec, altCount))
               let qual = prob2qual(pvalue)
               if qual >= minQual:
+                #FIXME create a proper vcf object so that we can init instead of writing 10s of lines
                 var vcfVar: Variant
                 vcfVar.chrom = plp.chromosome
                 vcfVar.pos = plp.refIndex
                 vcfVar.id = "."
                 vcfVar.refBase = plp.refBase
-                vcfVar.alt = b
+                vcfVar.alt = altBase
                 vcfVar.qual = qual
                 vcfVar.filter = "."
                 var info: InfoField
                 info.af = af
                 info.sb = 0# FIXME
                 var dp4: Dp4
-                dp4.refForward = 0#FIXME
-                dp4.refReverse = 0#FIXME
-                dp4.altForward = 0#FIXME
-                dp4.altReverse = 0#FIXME
+                dp4.refForward = baseCountsStranded.getOrDefault($plp.refBase.toUpperAscii)
+                dp4.refReverse = baseCountsStranded.getOrDefault($plp.refBase.toLowerAscii)
+                dp4.altForward = baseCountsStranded.getOrDefault(altBase.toUpperAscii)
+                dp4.altReverse = baseCountsStranded.getOrDefault(altBase.toLowerAscii)
                 info.dp4 = dp4
-                info.indel = false
                 vcfVar.info = info
-                echo "DEBUG: ", plp.chromosome, " ", plp.refIndex, " ", plp.refBase, " ", coverage, " ", baseCounts, " ", maxAltCount, " ", len(eProbs), " ", pvalue, " ", varQual
+                #echo "DEBUG: ", plp.chromosome, " ", plp.refIndex, " ", plp.refBase, " ", coverage, " ", baseCounts, " ", maxAltCount, " ", len(eProbs), " ", pvalue, " ", varQual
                 echo $vcfVar
-  
+              else:
+                # early exit possible since baseCounts sorted
+                break
+            else:
+              # early exit possible since baseCounts sorted
+              break
 
 when isMainModule:
   import cligen

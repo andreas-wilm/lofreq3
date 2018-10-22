@@ -16,7 +16,6 @@ type InfoField* = object
   af*: float
   sb*: int
   dp4*: Dp4
-  indel*: bool
 
 type Variant* = object
   chrom*: string
@@ -30,9 +29,8 @@ type Variant* = object
 
 
 proc `$`*(v: Variant): string =
-  let indel: int = if v.info.indel: 1 else: 0
   let dp4 = fmt"{v.info.dp4.refForward},{v.info.dp4.refReverse},{v.info.dp4.altForward},{v.info.dp4.altReverse}"
-  var info = fmt"AF={v.info.af:.6f};SB={v.info.sb};DP4={dp4};INDEL={indel}"
+  var info = fmt"AF={v.info.af:.6f};SB={v.info.sb};DP4={dp4}"
   fmt("{v.chrom}\t{v.pos}\t{v.id}\t{v.refBase}\t{v.alt}\t{v.qual}\t{v.filter}\t{info}")# fmt() to get tabs
 
 
@@ -50,7 +48,6 @@ proc vcfHeader*(src: string = "", refFa: string = ""): string =
 ##INFO=<ID=AF,Number=1,Type=Float,Description="Allele Frequency">
 ##INFO=<ID=SB,Number=1,Type=Integer,Description="Phred-scaled strand bias at this position">
 ##INFO=<ID=DP4,Number=4,Type=Integer,Description="Counts for ref-forward bases, ref-reverse, alt-forward and alt-reverse bases">
-##INFO=<ID=INDEL,Number=0,Type=Flag,Description="Indicates that the variant is an INDEL.">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO"""
 
 
