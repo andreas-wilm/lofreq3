@@ -127,8 +127,6 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
 
 
 proc parseOperationData(node: JsonNode): QualHist =
-  # FIXME parse reverse and forward counts here
-  # FIXME wrongly encoded in json
   result = initTable[string, CountTable[int]]()
 
   for event, qHist in node.pairs():
@@ -176,8 +174,8 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
     var eProbs: seq[float] = @[]
     var coverage = 0
 
-    # fill array of error probabilities, set baseCounts[] and coverage.
-    # note that base's strand is indicated by its case.
+    # Fill array of error probabilities, set baseCounts, baseCountsStranded and coverage.
+    # Note that base's strand is indicated by its case.
     for base, qhist in plp.matches.pairs():
       var thisBaseCount = 0
       assert len(base) == 1# because SNP branch
@@ -191,22 +189,14 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
           for i in countup(1, count):
             eProbs.add(e)
       coverage += thisBaseCount
-
-      #discard baseCountsStranded.hasKeyOrPut(base, 0)
       baseCountsStranded.inc(base, thisBaseCount)
-
-      let uBase = base.toUpperAscii
-      #discard baseCounts.hasKeyOrPut(uBase, 0)
-      baseCounts.inc(uBase, thisBaseCount)
-
+      baseCounts.inc(base.toUpperAscii, thisBaseCount)
     assert len(eProbs) + baseCounts.getOrDefault("*") == coverage
 
     # determine max number of alt snp counts. used for pruning in prunedProbDist().
     let (maxAltBase, maxAltCount) = largest(baseCounts)
-
-    if maxAltCount > 0:# chance to exit early if minAF is not met
-      # first pass loop: skip probDist calculation if below minAF
-      # for speedup
+    if maxAltCount > 0:
+      # skip probDist calculation if below minAF
       var passMinAF = false
       for b, c in pairs baseCounts:
         if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
@@ -223,7 +213,8 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
           if altBase[0] != plp.refBase and altBase[0] != 'N' and altBase[0] != '*':
             assert altCount <= prevAltCount
             prevAltCount = altCount
-            # need to check minAF again, because checks above were for any base in this column
+            # need to check minAF again, because we loop now and this might not be the most
+            # prominent base
             let af = altCount/coverage
             if af >= minAF:
               #let pvalue = exp(probVec[altCount]);
@@ -231,17 +222,16 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
               let qual = prob2qual(pvalue)
               if qual >= minQual:
                 #FIXME create a proper vcf object so that we can init instead of writing 10s of lines
-                var vcfVar: Variant
-                vcfVar.chrom = plp.chromosome
-                vcfVar.pos = plp.refIndex
-                vcfVar.id = "."
-                vcfVar.refBase = plp.refBase
-                vcfVar.alt = altBase
-                vcfVar.qual = qual
-                vcfVar.filter = "."
+                var vcfVar = Variant(chrom : plp.chromosome,
+                  pos : plp.refIndex,
+                  id : ".",
+                  refBase : plp.refBase,
+                  alt : altBase,
+                  qual : qual,
+                  filter : ".")
                 var info: InfoField
                 info.af = af
-                info.sb = 0# FIXME
+                info.sb = 0# FIXME against all or only DP4?
                 var dp4: Dp4
                 dp4.refForward = baseCountsStranded.getOrDefault($plp.refBase.toUpperAscii)
                 dp4.refReverse = baseCountsStranded.getOrDefault($plp.refBase.toLowerAscii)

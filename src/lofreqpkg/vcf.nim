@@ -17,7 +17,7 @@ type InfoField* = object
   sb*: int
   dp4*: Dp4
 
-type Variant* = object
+type Variant* = ref object
   chrom*: string
   pos*: int
   id*: string
