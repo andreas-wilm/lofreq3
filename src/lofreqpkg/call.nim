@@ -12,9 +12,11 @@ import strutils
 
 import vcf
 
+from hts/stats import fishers_exact_test
+
+
 
 type QualHist = Table[string, CountTable[int]]
-
 
 type PositionData = object
     ## The 'PositionData' object keeping all information concerning one parti-
@@ -126,30 +128,23 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
   return probVecPrev[0..K] # explicitly limiting to valid range
 
 
+## brief parse quality histogram for all operations from json node
 proc parseOperationData(node: JsonNode): QualHist =
   result = initTable[string, CountTable[int]]()
 
   for event, qHist in node.pairs():
     discard result.hasKeyOrPut(event, initCountTable[int]())
     for qual, count in qHist.pairs():
-      ##assert qual[0] == 'Q'
-      ## FIXME: string slicing and toInt simply doesn't work. Try: var
-      ## x = readLine(stdin); let q = parseInt(x[1..len(x)])
-      ## parseSaturatedNatural works but looks incredibly awkward
-      #discard parseSaturatedNatural(qual, q, start=1)
       let q = parseInt($qual)
       let c = count.getInt
 
       assert result[event].hasKey(q) == false
       result[event][q] = c
-  #echo("DEBUG returning " & $result)
 
 
 ## brief parse pileup object from json
 proc parsePlpJson(jsonString: string): PositionData =
   let dataJson = parseJson(jsonString)
-  #let dataJson = parseFile(fname)
-
   # assert used in nim in action after parsing json string
   assert dataJson.kind == JObject
   # FIXME should we validate the keys before starting to parse?
@@ -169,8 +164,8 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
 
   for line in lines(plpFname):
     var plp = parsePlpJson(line)
+    var baseCounts = initCountTable[string]()# base counts
     var baseCountsStranded = initCountTable[string]()# strand aware counts
-    var baseCounts = initCountTable[string]()
     var eProbs: seq[float] = @[]
     var coverage = 0
 
@@ -199,47 +194,42 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
       # skip probDist calculation if below minAF
       var passMinAF = false
       for b, c in pairs baseCounts:
-        if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
+        if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':# FIXME code duplication
           let af = baseCounts[b]/coverage
           if af >= minAF:
             passMinAF = true
             break
       if passMinAF == true:
-        # FIXME call by reference to safe memory
+        # FIXME call "by reference" to safe memory?
         let probVec = prunedProbDist(eProbs, maxAltCount)
         var prevAltCount = high(int)# paranoid check to ensure sorting of pairs and early exit
         sort(baseCounts)
         for altBase, altCount in pairs baseCounts:
-          if altBase[0] != plp.refBase and altBase[0] != 'N' and altBase[0] != '*':
+          if altBase[0] != plp.refBase and altBase[0] != 'N' and altBase[0] != '*':# FIXME code duplication
             assert altCount <= prevAltCount
             prevAltCount = altCount
-            # need to check minAF again, because we loop now and this might not be the most
-            # prominent base
+            # need to check minAF again, because test above was for more frequent base only
             let af = altCount/coverage
             if af >= minAF:
               #let pvalue = exp(probVec[altCount]);
               let pvalue = exp(probvecTailSum(probVec, altCount))
               let qual = prob2qual(pvalue)
               if qual >= minQual:
-                #FIXME create a proper vcf object so that we can init instead of writing 10s of lines
-                var vcfVar = Variant(chrom : plp.chromosome,
-                  pos : plp.refIndex,
-                  id : ".",
-                  refBase : plp.refBase,
-                  alt : altBase,
-                  qual : qual,
-                  filter : ".")
+                var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
+                  id : ".", refBase : plp.refBase, alt : altBase, qual : qual, filter : ".")
                 var info: InfoField
                 info.af = af
-                info.sb = 0# FIXME against all or only DP4?
                 var dp4: Dp4
                 dp4.refForward = baseCountsStranded.getOrDefault($plp.refBase.toUpperAscii)
                 dp4.refReverse = baseCountsStranded.getOrDefault($plp.refBase.toLowerAscii)
                 dp4.altForward = baseCountsStranded.getOrDefault(altBase.toUpperAscii)
                 dp4.altReverse = baseCountsStranded.getOrDefault(altBase.toLowerAscii)
                 info.dp4 = dp4
+
+                info.sb = 0# FIXME against all or only DP4?
+                var f = fishers_exact_test(dp4.refForward, dp4.refReverse, dp4.altForward, dp4.altReverse)
+                info.sb = prob2qual(f.two)
                 vcfVar.info = info
-                #echo "DEBUG: ", plp.chromosome, " ", plp.refIndex, " ", plp.refBase, " ", coverage, " ", baseCounts, " ", maxAltCount, " ", len(eProbs), " ", pvalue, " ", varQual
                 echo $vcfVar
               else:
                 # early exit possible since baseCounts sorted
