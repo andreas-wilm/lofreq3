@@ -3,17 +3,16 @@
 ## - Author: Andreas Wilm <wilma@gis.a-star.edu.sg>
 ## - License: The MIT License
 
-
+# standard
 import tables
 import json
 import utils
 import math
 import strutils
-
-import vcf
-
+# third party
 from hts/stats import fishers_exact_test
-
+# project specific
+import vcf
 
 
 type QualHist = Table[string, CountTable[int]]
@@ -125,7 +124,8 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
     swap(probvec, probVecPrev)
 
   # return prev because we just swapped (if not pruned)
-  return probVecPrev[0..K] # explicitly limiting to valid range
+  # explicitly limiting to valid range
+  return probVecPrev[0..K]
 
 
 ## brief parse quality histogram for all operations from json node
@@ -219,6 +219,7 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
                   id : ".", refBase : plp.refBase, alt : altBase, qual : qual, filter : ".")
                 var info: InfoField
                 info.af = af
+                info.dp = coverage
                 var dp4: Dp4
                 dp4.refForward = baseCountsStranded.getOrDefault($plp.refBase.toUpperAscii)
                 dp4.refReverse = baseCountsStranded.getOrDefault($plp.refBase.toLowerAscii)

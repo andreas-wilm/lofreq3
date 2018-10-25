@@ -7,7 +7,7 @@
 ## flexibility, it also opens up the door for abuse. The user is expected to
 ## pass valid data. The procedures' docs provide guidelines for their usage.
 ##
-## - Author: Filip Sodić <filip.sodic@gmail.com> 
+## - Author: Filip Sodić <filip.sodic@gmail.com>
 ## - License: The MIT License
 
 import operationData
@@ -26,7 +26,7 @@ type PositionData* = ref object
 
 proc newPositionData*(referenceIndex: int, referenceBase: char,
                       chromosome: string) : PositionData {.inline.} =
-  ## Constructs a new PositionData object keeping the data for 
+  ## Constructs a new PositionData object keeping the data for
   ## the given position on the reference.
   ## The position (wrt. the reference) is provided by the first argument.
   ## The second argument should provide the base appearing on the said

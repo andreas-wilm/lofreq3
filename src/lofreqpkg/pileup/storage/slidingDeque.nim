@@ -25,7 +25,7 @@ type DataToVoid =  proc(data: PositionData): void
 type DataToType[T] =  proc(data: PositionData): T
 
 
-# NOTE: The quue does not really need to be double ended, but the 'Queue' 
+# NOTE: The quue does not really need to be double ended, but the 'Queue'
 # module is deprecated.
 type SlidingDeque* = ref object
   ## Defines a 'SlidingDeque' type and its relevant fields.
@@ -34,7 +34,7 @@ type SlidingDeque* = ref object
   initialSize: int # estimated maximum size of the double ended queue
   beginning: int
   chromosome: string
-  # Having the chromosome as a a field on the storage object is certainly less 
+  # Having the chromosome as a a field on the storage object is certainly less
   # than ideal. I will probably change this to be injected later.
 
 
@@ -104,11 +104,11 @@ proc sanityCheck(beginning, length, position: int) : void {.inline.} =
     $position & ' ' & $beginning
   assert position <= (beginning + length), "Invalid position" &
     $position & $(beginning + length)
-  
+
 
 proc sanityCheckNoExtend(beginning, length, position: int): void {.inline.} =
   ## Checks whether the given position is valid based on the
-  ## current deque beginning and length. Assumes that the deque is not allowed 
+  ## current deque beginning and length. Assumes that the deque is not allowed
   ## to be extended.
   assert position >= beginning, "The file is not sorted: " &
     $position & ' ' & $beginning
@@ -122,9 +122,9 @@ proc ensureStorage(self: SlidingDeque, position:int,
   sanityCheck(self.beginning, length, position)
 
   if position == (self.beginning + length):
-    self.deq.addLast(newPositionData(length + self.beginning, refBase,
+    self.deq.addLast(newPositionData(position+1, refBase,
                         self.chromosome))
-  
+
 
 proc recordMatch*(self: SlidingDeque, position: int,
                   base: char, quality: int, reversed: bool,
@@ -132,7 +132,7 @@ proc recordMatch*(self: SlidingDeque, position: int,
   ## Records match event information on for a given position.
   self.ensureStorage(position, refBase)
   self.deq[position - self.beginning].addMatch(base, quality, reversed)
-    
+
 
 proc recordDeletion*(self: SlidingDeque, position: int, bases: string,
                      quality: int, reversed: bool): void {.inline.} =
@@ -152,7 +152,7 @@ proc recordInsertion*(self: SlidingDeque, position: int, bases: string,
 
 
 proc flushAll*(self: SlidingDeque): int {.inline.} =
-  ## Submits all elements currently contained in the queue 
+  ## Submits all elements currently contained in the queue
   ## for further processing. The method returns the number of
   ## submitted elements.
   result = self.deq.len
