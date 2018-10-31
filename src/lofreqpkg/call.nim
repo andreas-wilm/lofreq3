@@ -152,6 +152,7 @@ proc parsePlpJson(jsonString: string): PositionData =
 
   result.chromosome = dataJson["chromosome"].getStr
   result.refIndex =  dataJson["referenceIndex"].getInt
+  # could ignore lower case (masking) here if needed as feature
   result.refBase = dataJson["referenceBase"].getStr[0].toUpperAscii()
 
   result.matches = parseOperationData(dataJson["matches"])
@@ -162,7 +163,12 @@ proc parsePlpJson(jsonString: string): PositionData =
 proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
   echo vcfHeader()
 
-  for line in lines(plpFname):
+  var plpFh: File = if plpFname == "-": stdin else: open(plpFname)
+  defer:
+    if plpFh != stdin:
+      plpFh.close
+
+  for line in plpFh.lines:
     var plp = parsePlpJson(line)
     var baseCounts = initCountTable[string]()# base counts
     var baseCountsStranded = initCountTable[string]()# strand aware counts
@@ -187,6 +193,7 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
       baseCountsStranded.inc(base, thisBaseCount)
       baseCounts.inc(base.toUpperAscii, thisBaseCount)
     assert len(eProbs) + baseCounts.getOrDefault("*") == coverage
+    #echo plp.chromosome, " ", plp.refIndex, " ", plp.refBase, $baseCounts
 
     # determine max number of alt snp counts. used for pruning in prunedProbDist().
     let (maxAltBase, maxAltCount) = largest(baseCounts)
