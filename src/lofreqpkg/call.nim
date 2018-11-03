@@ -11,11 +11,13 @@ import math
 import strutils
 # third party
 from hts/stats import fishers_exact_test
+
 # project specific
 import vcf
 
 
 type QualHist = Table[string, CountTable[int]]
+
 
 type PositionData = object
     ## The 'PositionData' object keeping all information concerning one parti-
@@ -43,7 +45,7 @@ proc logSum(logA: float32, logB: float32): float32 =
 ## tail_startindex to (excluding) probvec_len
 ##
 proc probvecTailSum(probVec: openArray[float], tailStartIndex: int): float =
-  result = probVec[tailStartIndex];
+  result = probVec[tailStartIndex]
   for i in tailStartIndex+1..<len(probVec):
     result = logSum(result, probVec[i]);
 
@@ -160,6 +162,99 @@ proc parsePlpJson(jsonString: string): PositionData =
   result.deletions = parseOperationData(dataJson["deletions"])
 
 
+proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Variant] =#{.gcsafe.} =
+  var baseCounts = initCountTable[string]()# base counts
+  var baseCountsStranded = initCountTable[string]()# strand aware counts
+  var eProbs: seq[float] = @[]
+
+  # Fill array of error probabilities, set baseCounts and baseCountsStranded.
+  # Note that base's strand is indicated by its case.
+  for base, qhist in plp.matches.pairs():
+    var thisBaseCount = 0
+    assert len(base) == 1# because SNP branch
+    for qual, count in qhist:
+      assert count>=0
+      thisBaseCount += count
+      # '*' are deletions, i.e. physical coverage (count) with q=-1 (ignore)
+      if base != "*":
+        assert qual>=0# "*" have q=-1
+        let e = qual2prob(qual)
+        for i in countup(1, count):
+          eProbs.add(e)
+    baseCountsStranded.inc(base, thisBaseCount)
+    baseCounts.inc(base.toUpperAscii, thisBaseCount)
+
+  # determine coverage (not merged into above for readability)
+  var coverage = 0
+  for b, c in pairs baseCounts:
+    coverage += c
+  assert len(eProbs) + baseCounts.getOrDefault("*") == coverage
+
+  # determine valid alt bases (not merged into above for readability)
+  var altBases: seq[string]
+  for b, c in pairs baseCounts:
+    if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
+      altBases.add(b)
+
+  # determine most max alt count (not merged into above for readability)
+  var maxAltCount = 0
+  for b in altBases:
+    let c = baseCounts[b]
+    if c > maxAltCount:
+      maxAltCount = c
+
+  #echo "DEBUG baseCounts at " & $plp.refIndex & " = " & $baseCounts
+  #echo "DEBUG maxAltCount at " & $plp.refIndex & " = " & $maxAltCount
+
+  # loop over altBases and determine whether they are variants
+  let maxAF = maxAltCount/coverage
+  if maxAF >= minAF:# don't even compute probDist if we can't reach minAF with most abundant base
+    let probVec = prunedProbDist(eProbs, maxAltCount)# FIXME call "by reference" to safe memory?
+    var prevAltCount = high(int)# paranoid check to ensure sorting of pairs and early exit
+    sort(baseCounts)
+    for altBase, altCount in pairs baseCounts:
+      # looping over altBases and getting altCount directly doesn't seem to work after (destructive)
+      # sort on baseCounts. only iterators supported?
+      if not altBases.contains(altBase):
+        #echo "DEBUG: " & $altBase & " not in " & $altBases
+        continue
+      assert altCount <= prevAltCount
+      prevAltCount = altCount
+
+      # need to check minAF again, because test above was for more frequent base only
+      let af = altCount/coverage
+      if af < minAF:
+        #echo "DEBUG af<minAF for " & altBase & ":" & $altCount & " = " & $af & "<" & $minAF
+        break# early exit possible since baseCounts are sorted
+
+      #let pvalue = exp(probVec[altCount]);
+      let pvalue = exp(probvecTailSum(probVec, altCount))# which one now?
+      let qual = prob2qual(pvalue)
+      if qual < minQual:
+        #echo "DEBUG qual<minQual for " & altBase & ":" & $altCount & " = " & $qual & "<" & $minQual
+        break# early exit possible since baseCounts are sorted
+
+      #echo "DEBUG: creating var"
+      var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
+        id : ".", refBase : plp.refBase, alt : altBase, qual : qual, filter : ".")
+      var info: InfoField
+      info.af = af
+      info.dp = coverage
+      var dp4: Dp4
+      dp4.refForward = baseCountsStranded.getOrDefault($plp.refBase.toUpperAscii)
+      dp4.refReverse = baseCountsStranded.getOrDefault($plp.refBase.toLowerAscii)
+      dp4.altForward = baseCountsStranded.getOrDefault(altBase.toUpperAscii)
+      dp4.altReverse = baseCountsStranded.getOrDefault(altBase.toLowerAscii)
+      info.dp4 = dp4
+      var f = fishers_exact_test(dp4.refForward, dp4.refReverse, dp4.altForward, dp4.altReverse)
+      info.sb = prob2qual(f.two)
+      vcfVar.info = info
+
+      result.add(vcfVar)
+  #else:
+    #echo "DEBUG maxAF<minAF: " & $maxAF & "<" & $minAF
+
+
 proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
   echo vcfHeader()
 
@@ -170,81 +265,10 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
 
   for line in plpFh.lines:
     var plp = parsePlpJson(line)
-    var baseCounts = initCountTable[string]()# base counts
-    var baseCountsStranded = initCountTable[string]()# strand aware counts
-    var eProbs: seq[float] = @[]
-    var coverage = 0
+    let vcfVars = call(plp, minQual, minAF)
+    if len(vcfVars) > 0:
+      echo vcfVars.join("\n")
 
-    # Fill array of error probabilities, set baseCounts, baseCountsStranded and coverage.
-    # Note that base's strand is indicated by its case.
-    for base, qhist in plp.matches.pairs():
-      var thisBaseCount = 0
-      assert len(base) == 1# because SNP branch
-      for qual, count in qhist:
-        assert count>=0
-        thisBaseCount += count
-        # '*' are deletions, i.e. physical coverage (count) with q=-1 (ignore)
-        if base != "*":
-          assert qual>=0# "*" have q=-1
-          let e = qual2prob(qual)
-          for i in countup(1, count):
-            eProbs.add(e)
-      coverage += thisBaseCount
-      baseCountsStranded.inc(base, thisBaseCount)
-      baseCounts.inc(base.toUpperAscii, thisBaseCount)
-    assert len(eProbs) + baseCounts.getOrDefault("*") == coverage
-    #echo plp.chromosome, " ", plp.refIndex, " ", plp.refBase, $baseCounts
-
-    # determine max number of alt snp counts. used for pruning in prunedProbDist().
-    let (maxAltBase, maxAltCount) = largest(baseCounts)
-    if maxAltCount > 0:
-      # skip probDist calculation if below minAF
-      var passMinAF = false
-      for b, c in pairs baseCounts:
-        if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':# FIXME code duplication
-          let af = baseCounts[b]/coverage
-          if af >= minAF:
-            passMinAF = true
-            break
-      if passMinAF == true:
-        # FIXME call "by reference" to safe memory?
-        let probVec = prunedProbDist(eProbs, maxAltCount)
-        var prevAltCount = high(int)# paranoid check to ensure sorting of pairs and early exit
-        sort(baseCounts)
-        for altBase, altCount in pairs baseCounts:
-          if altBase[0] != plp.refBase and altBase[0] != 'N' and altBase[0] != '*':# FIXME code duplication
-            assert altCount <= prevAltCount
-            prevAltCount = altCount
-            # need to check minAF again, because test above was for more frequent base only
-            let af = altCount/coverage
-            if af >= minAF:
-              #let pvalue = exp(probVec[altCount]);
-              let pvalue = exp(probvecTailSum(probVec, altCount))
-              let qual = prob2qual(pvalue)
-              if qual >= minQual:
-                var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
-                  id : ".", refBase : plp.refBase, alt : altBase, qual : qual, filter : ".")
-                var info: InfoField
-                info.af = af
-                info.dp = coverage
-                var dp4: Dp4
-                dp4.refForward = baseCountsStranded.getOrDefault($plp.refBase.toUpperAscii)
-                dp4.refReverse = baseCountsStranded.getOrDefault($plp.refBase.toLowerAscii)
-                dp4.altForward = baseCountsStranded.getOrDefault(altBase.toUpperAscii)
-                dp4.altReverse = baseCountsStranded.getOrDefault(altBase.toLowerAscii)
-                info.dp4 = dp4
-
-                info.sb = 0# FIXME against all or only DP4?
-                var f = fishers_exact_test(dp4.refForward, dp4.refReverse, dp4.altForward, dp4.altReverse)
-                info.sb = prob2qual(f.two)
-                vcfVar.info = info
-                echo $vcfVar
-              else:
-                # early exit possible since baseCounts sorted
-                break
-            else:
-              # early exit possible since baseCounts sorted
-              break
 
 when isMainModule:
   import cligen
