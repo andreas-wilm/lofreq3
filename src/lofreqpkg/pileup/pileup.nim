@@ -17,15 +17,14 @@ import pipetools
 import postprocessing
 
 
-proc pileup*(bamFname: string, faFname: string) =
+proc pileup*(bamFname: string, faFname: string, ignBQ2 = false) =
   ## Performs the pileup over all chromosomes listed in the bam file.
-  ## FIXME: enable multithreading.
   var bam: Bam
   var fai: Fai
 
   if not open(fai, faFname):
     quit("Could not open fasta file.")
-  
+
   open(bam, bamFname, index=true)
 
   for chromosome in targets(bam.hdr):
@@ -33,9 +32,9 @@ proc pileup*(bamFname: string, faFname: string) =
 
     var records = newRecordFilter(bam, name)
     var reference = fai.loadSequence(name)
-    
+
     var storage = newSlidingDeque(name, toJson.then(print))
-    var processor = newProcessor(storage)
+    var processor = newProcessor(storage, ignBQ2)
     pileup(records, reference, processor)
 
 when isMainModule:

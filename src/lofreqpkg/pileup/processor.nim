@@ -19,7 +19,7 @@ import strutils
 # placeholders until we find a way to record true qualities
 const DEFAULT_DELETION_QUALITY = 40
 const DEFAULT_INSERTION_QUALITY = 40
-const DEFAULT_BLANK_QUALITY = -1 
+const DEFAULT_BLANK_QUALITY = -1
 const DEFAULT_BLANK_SYMBOL = '*' # missing position symbol
 
 
@@ -30,7 +30,7 @@ const DEFAULT_BLANK_SYMBOL = '*' # missing position symbol
 ## base.  Hovewer, this should not really make a difference since, in most
 ## cases, all deletion and insertion quality data is found in the record's
 ## custom fields.
-type TQualityProc = proc (r: Record, i: int): int 
+type TQualityProc = proc (r: Record, i: int): int
 
 type Processor[TStorage] = ref object
   ## The 'Processor' type. Its fields are configuration options.
@@ -43,7 +43,8 @@ type Processor[TStorage] = ref object
 proc newProcessor*[TStorage](storage: TStorage,
                              matchQuality: TQualityProc,
                              insertionQuality: TQualityProc,
-                             deletionQuality: TQualityProc
+                             deletionQuality: TQualityProc,
+                             ignBQ2= false
                             ): Processor[TStorage] {.inline.} =
   ## Creates a new 'Processor'. The operation quality is calculated using the
   ## provided functions. The processor stores and updates the data in the
@@ -52,22 +53,29 @@ proc newProcessor*[TStorage](storage: TStorage,
   Processor[TStorage](storage: storage,
                       matchQualityAt: matchQuality,
                       insertionQualityAt: insertionQuality,
-                      deletionQualityAt: deletionQuality
+                      deletionQualityAt: deletionQuality,
+                      ignBQ2= false
                      )
 
 
-proc newProcessor*[TStorage](storage: TStorage):
+proc matchQualityAt_Default(r: Record, i: int): int =
+  int(r.baseQualityAt(i))
+
+
+proc matchQualityAt_ignBQ2(r: Record, i: int): int =
+  let q = int(r.baseQualityAt(i))
+  if q==2: -1 else: q
+
+
+proc newProcessor*[TStorage](storage: TStorage, ignBQ2= false):
                               Processor[TStorage] {.inline.} =
-  ## The default constructor for the 'Processor' type. Used mainly for testing 
-  ## purposes.
+  ## The default constructor for the 'Processor' type.
   Processor[TStorage](storage: storage,
-                      matchQualityAt: proc(r: Record, i: int): int =
-                        int(r.baseQualityAt(i)),
+                      matchQualityAt: if ignBQ2: matchQualityAt_ignBQ2 else: matchQualityAt_Default,
                       insertionQualityAt: proc(r: Record, i: int): int =
                         DEFAULT_INSERTION_QUALITY,
                       deletionQualityAt: proc(r: Record, i: int): int =
-                        DEFAULT_DELETION_QUALITY
-                     )
+                        DEFAULT_DELETION_QUALITY)
 
 
 proc processMatches*[TSequence](self: Processor,
@@ -79,12 +87,14 @@ proc processMatches*[TSequence](self: Processor,
   for offset in countUp(0, length - 1):
     let refOff = refStart + offset
     let readOff = readStart + offset
-    self.storage.recordMatch(refOff, read.baseAt(readOff),
-                             self.matchQualityAt(read, readOff),
-                             read.flag.reverse,
-                             reference.baseAt(refOff))
+    # q == -1 is filtering signal
+    let bq = self.matchQualityAt(read, readOff)
+    if bq != -1:
+      self.storage.recordMatch(refOff, read.baseAt(readOff),
+                               bq,
+                               read.flag.reverse,
+                               reference.baseAt(refOff))
 
-  
 
 proc processInsertion*[TSequence](self: Processor,
                      readStart: int, refIndex: int, length: int,
@@ -100,7 +110,6 @@ proc processInsertion*[TSequence](self: Processor,
   self.storage.recordInsertion(refIndex - 1, value,
                                self.insertionQualityAt(read, readStart),
                                read.flag.reverse)
-
 
 
 proc processDeletion*[TSequence](self: Processor,

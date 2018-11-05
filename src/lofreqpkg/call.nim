@@ -9,6 +9,8 @@ import json
 import utils
 import math
 import strutils
+import logging
+
 # third party
 from hts/stats import fishers_exact_test
 
@@ -29,6 +31,10 @@ type PositionData = object
     deletions: QualHist
     insertions: QualHist
 
+# From the docs "Warning: The global list of handlers is a thread var,
+# # this means that the handlers must be re-added in each thread."
+var L = newConsoleLogger()
+addHandler(L)
 
 ## brief Computes log(exp(logA) + exp(logB))
 ##
@@ -184,27 +190,25 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
     baseCountsStranded.inc(base, thisBaseCount)
     baseCounts.inc(base.toUpperAscii, thisBaseCount)
 
+  #echo "DEBUG: eprobs=", $eprobs
+
   # determine coverage (not merged into above for readability)
   var coverage = 0
   for b, c in pairs baseCounts:
     coverage += c
   assert len(eProbs) + baseCounts.getOrDefault("*") == coverage
 
-  # determine valid alt bases (not merged into above for readability)
+  # determine valid alt bases and max alt count (not merged into above for readability)
   var altBases: seq[string]
+  var maxAltCount = 0
   for b, c in pairs baseCounts:
     if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
       altBases.add(b)
+      if c > maxAltCount:
+        maxAltCount = c
 
-  # determine most max alt count (not merged into above for readability)
-  var maxAltCount = 0
-  for b in altBases:
-    let c = baseCounts[b]
-    if c > maxAltCount:
-      maxAltCount = c
-
-  #echo "DEBUG baseCounts at " & $plp.refIndex & " = " & $baseCounts
-  #echo "DEBUG maxAltCount at " & $plp.refIndex & " = " & $maxAltCount
+  #debug "baseCounts at " & $plp.refIndex & " = " & $baseCounts
+  #debug "maxAltCount at " & $plp.refIndex & " = " & $maxAltCount
 
   # loop over altBases and determine whether they are variants
   let maxAF = maxAltCount/coverage
@@ -227,8 +231,8 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
         #echo "DEBUG af<minAF for " & altBase & ":" & $altCount & " = " & $af & "<" & $minAF
         break# early exit possible since baseCounts are sorted
 
-      #let pvalue = exp(probVec[altCount]);
-      let pvalue = exp(probvecTailSum(probVec, altCount))# which one now?
+      # for maxAltCount exp(probVec[altCount]) == exp(probvecTailSum(probVec, altCount))
+      let pvalue = exp(probvecTailSum(probVec, altCount))
       let qual = prob2qual(pvalue)
       if qual < minQual:
         #echo "DEBUG qual<minQual for " & altBase & ":" & $altCount & " = " & $qual & "<" & $minQual
