@@ -1,0 +1,5 @@
+A:42  A:42  A:42  A:42  -     G:43  C:45  C:42  T:44  T:44  A:43  -     -     A:42  A:43
+-     -     -     -     -     -     C:24  -     -     T:25  A:26  -     -     A:27  A:28  G:29
+A     A     A     A     -     G     C     C     T     T     A     C     T     A     A
+
+A     A     C     A     C     G     C     C     T     T     A     -     -     -     A     G      T

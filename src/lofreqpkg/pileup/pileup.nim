@@ -17,7 +17,8 @@ import pipetools
 import postprocessing
 
 
-proc pileup*(bamFname: string, faFname: string, ignBQ2 = false) =
+proc full_pileup*(bamFname: string, faFname: string, ignBQ2: bool,
+                  handler: DataToVoid) : void =
   ## Performs the pileup over all chromosomes listed in the bam file.
   var bam: Bam
   var fai: Fai
@@ -33,9 +34,15 @@ proc pileup*(bamFname: string, faFname: string, ignBQ2 = false) =
     var records = newRecordFilter(bam, name)
     var reference = fai.loadSequence(name)
 
-    var storage = newSlidingDeque(name, toJson.then(print))
+    var storage = newSlidingDeque(name, handler)
     var processor = newProcessor(storage, ignBQ2)
-    pileup(records, reference, processor)
+
+    algorithm.pileup(records, reference, processor)
+
+
+proc pileup*(bamFname: string, faFname: string, ignBQ2: bool = false) =
+  full_pileup(bamFname, faFname, ignBQ2, toJson.then(print))
+ 
 
 when isMainModule:
   import cligen

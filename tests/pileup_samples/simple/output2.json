@@ -1,0 +1,251 @@
+[
+{
+    "chromosome": "ref",
+    "referenceIndex": 1,
+    "referenceBase": "A",
+    "matches":
+    {
+        "A":
+        {
+            "42": 1,
+            "255": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 2,
+    "referenceBase": "A",
+    "matches":
+    {
+        "A":
+        {
+            "42": 1,
+            "255": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 3,
+    "referenceBase": "C",
+    "matches":
+    {
+        "A":
+        {
+            "42": 1,
+            "255": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 4,
+    "referenceBase": "A",
+    "matches":
+    {
+        "A":
+        {
+            "42": 1,
+            "255": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {
+        "C":
+        {
+            "40": 2
+        }
+    }
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 5,
+    "referenceBase": "C",
+    "matches":
+    {
+        "*":
+        {
+            "-1": 2
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 6,
+    "referenceBase": "G",
+    "matches":
+    {
+        "G":
+        {
+            "43": 1,
+            "255": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 7,
+    "referenceBase": "C",
+    "matches":
+    {
+        "C":
+        {
+            "24": 1,
+            "45": 1,
+            "255": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {
+        "CT":
+        {
+            "40": 1
+        }
+    }
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 8,
+    "referenceBase": "C",
+    "matches":
+    {
+        "C":
+        {
+            "42": 1,
+            "255": 1
+        },
+        "*":
+        {
+            "-1": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 9,
+    "referenceBase": "T",
+    "matches":
+    {
+        "T":
+        {
+            "44": 1,
+            "255": 1
+        },
+        "*":
+        {
+            "-1": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 10,
+    "referenceBase": "T",
+    "matches":
+    {
+        "T":
+        {
+            "25": 1,
+            "44": 1,
+            "255": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 11,
+    "referenceBase": "A",
+    "matches":
+    {
+        "A":
+        {
+            "26": 1,
+            "43": 1,
+            "255": 1
+        }
+    },
+    "insertions":
+    {
+        "A":
+        {
+            "40": 2
+        },
+        "CTA":
+        {
+            "40": 1
+        }
+    },
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 12,
+    "referenceBase": "A",
+    "matches":
+    {
+        "A":
+        {
+            "28": 1,
+            "43": 1,
+            "255": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+},
+{
+    "chromosome": "ref",
+    "referenceIndex": 13,
+    "referenceBase": "G",
+    "matches":
+    {
+        "G":
+        {
+            "29": 1
+        }
+    },
+    "insertions":
+    {},
+    "deletions":
+    {}
+}]

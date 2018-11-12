@@ -18,11 +18,11 @@ import ../pipetools
 ## Defines a type of the expected submit procedure. It should consume a
 ## 'PositionData' object without returning a result (since the storage should
 ## not be responsible for processing any data after it is collected.
-type DataToVoid =  proc(data: PositionData): void
+type DataToVoid* =  proc(data: PositionData): void
 
 ## Defines a type which can be wrapped into a submit procedure type
 ## 'DataToVoid' with a discard operation.
-type DataToType[T] =  proc(data: PositionData): T
+type DataToType*[T] =  proc(data: PositionData): T
 
 
 # NOTE: The quue does not really need to be double ended, but the 'Queue'
