@@ -20,7 +20,6 @@ import vcf
 
 type QualHist = Table[string, CountTable[int]]
 
-
 type PositionData = object
     ## The 'PositionData' object keeping all information concerning one parti-
     ## cular position on the reference.
@@ -31,10 +30,12 @@ type PositionData = object
     deletions: QualHist
     insertions: QualHist
 
+
 # From the docs "Warning: The global list of handlers is a thread var,
 # # this means that the handlers must be re-added in each thread."
 var L = newConsoleLogger()
 addHandler(L)
+
 
 ## brief Computes log(exp(logA) + exp(logB))
 ##
@@ -63,8 +64,7 @@ proc probvecTailSum(probVec: openArray[float], tailStartIndex: int): float =
 # FIXME add pseudocode from paper here
 # previously pruned_calc_prob_dist()
 proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
-                     K: Natural,
-                     bonf = 1.0, sig = 1.0): seq[float] =
+                     K: Natural, bonf = 1.0, sig = 1.0): seq[float] =
   assert K > 0
   var probVec = newSeq[float64](K+1)
   var probVecPrev = newSeq[float64](K+1)
@@ -168,10 +168,26 @@ proc parsePlpJson(jsonString: string): PositionData =
   result.deletions = parseOperationData(dataJson["deletions"])
 
 
+proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
+  baseCountsStranded: CountTable[string]): InfoField =
+  result.af = af
+  result.dp = coverage
+  var dp4: Dp4
+  dp4.refForward = baseCountsStranded.getOrDefault($refBase.toUpperAscii)
+  dp4.refReverse = baseCountsStranded.getOrDefault($refBase.toLowerAscii)
+  dp4.altForward = baseCountsStranded.getOrDefault(altBase.toUpperAscii)
+  dp4.altReverse = baseCountsStranded.getOrDefault(altBase.toLowerAscii)
+  result.dp4 = dp4
+  var f = fishers_exact_test(dp4.refForward, dp4.refReverse,
+    dp4.altForward, dp4.altReverse)
+  result.sb = prob2qual(f.two)
+
+
+## result is a sequence, because we might return multiple variants for this position
 proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Variant] =#{.gcsafe.} =
   var baseCounts = initCountTable[string]()# base counts
   var baseCountsStranded = initCountTable[string]()# strand aware counts
-  var eProbs: seq[float] = @[]
+  var eProbs: seq[float] = @[]# base error probabilites
 
   # Fill array of error probabilities, set baseCounts and baseCountsStranded.
   # Note that base's strand is indicated by its case.
@@ -192,7 +208,8 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
 
   #echo "DEBUG: eprobs=", $eprobs
 
-  # determine coverage (not merged into above for readability)
+  # determine coverage (not merged into above for readability).
+  # this includes spanning insertions.
   var coverage = 0
   for b, c in pairs baseCounts:
     coverage += c
@@ -206,28 +223,26 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
       altBases.add(b)
       if c > maxAltCount:
         maxAltCount = c
-
   #debug "baseCounts at " & $plp.refIndex & " = " & $baseCounts
   #debug "maxAltCount at " & $plp.refIndex & " = " & $maxAltCount
 
   # loop over altBases and determine whether they are variants
   let maxAF = maxAltCount/coverage
-  if maxAF >= minAF:# don't even compute probDist if we can't reach minAF with most abundant base
+  if maxAF >= minAF and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
     let probVec = prunedProbDist(eProbs, maxAltCount)# FIXME call "by reference" to safe memory?
     var prevAltCount = high(int)# paranoid check to ensure sorting of pairs and early exit
     sort(baseCounts)
     for altBase, altCount in pairs baseCounts:
-      # looping over altBases and getting altCount directly doesn't seem to work after (destructive)
-      # sort on baseCounts. only iterators supported?
+      # weird: ooping over altBases and getting altCount directly doesn't seem to work after
+      # (destructive) sort on baseCounts. only iterators supported?
       if not altBases.contains(altBase):
-        #echo "DEBUG: " & $altBase & " not in " & $altBases
         continue
       assert altCount <= prevAltCount
       prevAltCount = altCount
 
-      # need to check minAF again, because test above was for more frequent base only
+      # need to check minAF again, because test above was for most frequent base only
       let af = altCount/coverage
-      if af < minAF:
+      if af < minAF or altCount == 0:
         #echo "DEBUG af<minAF for " & altBase & ":" & $altCount & " = " & $af & "<" & $minAF
         break# early exit possible since baseCounts are sorted
 
@@ -241,19 +256,7 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
       #echo "DEBUG: creating var"
       var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
         id : ".", refBase : plp.refBase, alt : altBase, qual : qual, filter : ".")
-      var info: InfoField
-      info.af = af
-      info.dp = coverage
-      var dp4: Dp4
-      dp4.refForward = baseCountsStranded.getOrDefault($plp.refBase.toUpperAscii)
-      dp4.refReverse = baseCountsStranded.getOrDefault($plp.refBase.toLowerAscii)
-      dp4.altForward = baseCountsStranded.getOrDefault(altBase.toUpperAscii)
-      dp4.altReverse = baseCountsStranded.getOrDefault(altBase.toLowerAscii)
-      info.dp4 = dp4
-      var f = fishers_exact_test(dp4.refForward, dp4.refReverse, dp4.altForward, dp4.altReverse)
-      info.sb = prob2qual(f.two)
-      vcfVar.info = info
-
+      vcfVar.info = setVarInfo(af, coverage, plp.refBase, altBase, baseCountsStranded)
       result.add(vcfVar)
   #else:
     #echo "DEBUG maxAF<minAF: " & $maxAF & "<" & $minAF
