@@ -213,14 +213,14 @@ proc flushUpTo*(self: SlidingDeque, position: int): int {.inline.} =
   #     let entry0 = storage[0]
   #     doAssert entry0.events["A"] == 1
   #     doAssert entry0.events["C"] == 2
-  #     doAssert entry0.referenceBase == 'A'
-  #     doAssert entry0.referenceIndex == 0
+  #     doAssert entry0.refBase == 'A'
+  #     doAssert entry0.refIndex == 0
 
   #     let entry1 = storage[1]
   #     doAssert entry1.events["G"] == 1
   #     doAssert entry1.events["-AA"] == 1
-  #     doAssert entry1.referenceBase == 'G'
-  #     doAssert entry1.referenceIndex == 1
+  #     doAssert entry1.refBase == 'G'
+  #     doAssert entry1.refIndex == 1
 
   #     # illegal gets
   #     try: 
@@ -255,11 +255,11 @@ proc flushUpTo*(self: SlidingDeque, position: int): int {.inline.} =
   #     doAssert storage.deq.len == 1
   #     doAssert acc.len == 2
 
-  #     doAssert acc[0].referenceIndex == 0
-  #     doAssert acc[0].referenceBase == 'A'
+  #     doAssert acc[0].refIndex == 0
+  #     doAssert acc[0].refBase == 'A'
 
-  #     doAssert acc[1].referenceBase == 'G'
-  #     doAssert acc[1].referenceIndex == 1
+  #     doAssert acc[1].refBase == 'G'
+  #     doAssert acc[1].refIndex == 1
 
   #   block: # test flush without overlap
   #     var acc: seq[PositionData] = @[]
@@ -274,14 +274,14 @@ proc flushUpTo*(self: SlidingDeque, position: int): int {.inline.} =
   #     doAssert storage.deq.len == 0
   #     doAssert acc.len == 3
 
-  #     doAssert acc[0].referenceIndex == 0
-  #     doAssert acc[0].referenceBase == 'A'
+  #     doAssert acc[0].refIndex == 0
+  #     doAssert acc[0].refBase == 'A'
 
-  #     doAssert acc[1].referenceBase == 'G'
-  #     doAssert acc[1].referenceIndex == 1
+  #     doAssert acc[1].refBase == 'G'
+  #     doAssert acc[1].refIndex == 1
 
-  #     doAssert acc[2].referenceBase == 'T'
-  #     doAssert acc[2].referenceIndex == 2
+  #     doAssert acc[2].refBase == 'T'
+  #     doAssert acc[2].refIndex == 2
 
   #   block:
   #     var actual : seq[PositionData] = @[]

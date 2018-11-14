@@ -16,15 +16,15 @@ import json
 type PositionData* = ref object
     ## The 'PositionData' object keeping all information concerning one parti-
     ## cular position on the reference.
-    referenceIndex: int
-    referenceBase: char
+    refIndex: int
+    refBase: char
     chromosome: string
     matches: OperationData[char]
     deletions: OperationData[string]
     insertions: OperationData[string]
 
 
-proc newPositionData*(referenceIndex: int, referenceBase: char,
+proc newPositionData*(refIndex: int, refBase: char,
                       chromosome: string) : PositionData {.inline.} =
   ## Constructs a new PositionData object keeping the data for
   ## the given position on the reference.
@@ -34,8 +34,8 @@ proc newPositionData*(referenceIndex: int, referenceBase: char,
   ## The third argument must specify the name of the chromosome the
   ## reference sequence belongs to.
   PositionData(
-    referenceIndex: referenceIndex,
-    referenceBase: referenceBase,
+    refIndex: refIndex,
+    refBase: refBase,
     chromosome: chromosome,
     matches: initOperationData[char](),
     insertions: initOperationData[string](),
@@ -80,8 +80,8 @@ proc addDeletion*(self: var PositionData, bases: string, quality: int,
 proc `%`*(self: PositionData): JsonNode {.inline.} =
   %{
     "chromosome": %self.chromosome,
-    "referenceIndex": %self.referenceIndex,
-    "referenceBase": %($self.referenceBase),
+    "refIndex": %self.refIndex,
+    "refBase": %($self.refBase),
     "matches": %self.matches,
     "insertions": %self.insertions,
     "deletions": %self.deletions

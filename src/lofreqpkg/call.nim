@@ -159,9 +159,9 @@ proc parsePlpJson(jsonString: string): PositionData =
   # what about extra keys for example. should they be ignored?
 
   result.chromosome = dataJson["chromosome"].getStr
-  result.refIndex =  dataJson["referenceIndex"].getInt
+  result.refIndex =  dataJson["refIndex"].getInt
   # could ignore lower case (masking) here if needed as feature
-  result.refBase = dataJson["referenceBase"].getStr[0].toUpperAscii()
+  result.refBase = dataJson["refBase"].getStr[0].toUpperAscii()
 
   result.matches = parseOperationData(dataJson["matches"])
   result.insertions = parseOperationData(dataJson["insertions"])
