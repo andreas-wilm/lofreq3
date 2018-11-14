@@ -5,3 +5,4 @@ lofreq
 tests/all
 tmp/
 *.swp
+lofreq.dSYM/

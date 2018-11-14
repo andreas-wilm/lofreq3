@@ -1,0 +1,13 @@
+Reads with 10 bases each. 7 reads total. only 2 valid. one with plain bq4 and one with plain bq 6.
+change their bases in turn to create one var per pos, thus each having
+AF=0.50*,SB=0, DP=2, and DP4=1,0,0,1 or DP4=0,1,1,0
+
+Q should be 19 in both cases since we don't distinguish between refq and alt
+
+```
+c = (0.01, 0.001)
+library(ppoibin)
+nerrs = 1
+pv = ppoibin(kk=length(pp)-nerrs, pp=1-pp)
+-10.0 * log10(pv)
+```

@@ -70,6 +70,7 @@ proc matchQualityAt_ignBQ2(r: Record, i: int): int =
 proc newProcessor*[TStorage](storage: TStorage, ignBQ2= false):
                               Processor[TStorage] {.inline.} =
   ## The default constructor for the 'Processor' type.
+  #FIXME use varargs to pass parameters down?
   Processor[TStorage](storage: storage,
                       matchQualityAt: if ignBQ2: matchQualityAt_ignBQ2 else: matchQualityAt_Default,
                       insertionQualityAt: proc(r: Record, i: int): int =

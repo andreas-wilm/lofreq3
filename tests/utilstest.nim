@@ -1,10 +1,9 @@
 import unittest
 import math
 
-
 import ../src/lofreqpkg/utils
 
-    
+
 suite "qual and prob conversion":
   #setup:
   #   echo "suite setup: run before each test"

@@ -3,7 +3,7 @@ author        = "Andreas Wilm and others"
 description   = "LoFreq Reimplementation in Nim"
 license       = "MIT"
 
-requires "nim >= 0.19", "cligen >= 0.9.16", "hts >= 0.2.5"
+requires "nim >= 0.19", "cligen >= 0.9.16", "hts >= 0.2.5", "tempfile >= 0.1.5"
 
 srcDir = "src"
 

@@ -17,14 +17,11 @@ suite "pileup tests":
 
     for kind, folderPath in walkDir("pileup_samples"):
       actual = newJArray()
-
       let faiFile = joinPath(folderPath, "ref.fa")
       let bamFile = joinPath(folderPath, "alignments.bam")
-
       let expected = parseFile(joinPath(folderPath, "output.json"))
 
+      #echo "Checking pileup of " & bamFile & " with " & faiFile
       full_pileup(bamFile, faiFile, false,
                   toJson.then(proc (x: JsonNode): void = actual.add(x)))
-
       check expected == actual
-

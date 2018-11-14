@@ -1,0 +1,1 @@
+	 head -n 5 /Users/wilma/GIS/lofreq/lofreq_testing_data/ecoli-clone/ref/Ecoli_K12_MG1655_NC_000913.fa > NC_000913.n200.fa 
