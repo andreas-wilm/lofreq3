@@ -33,11 +33,11 @@ const DEFAULT_IGNORE_FLAGS*: uint16 =
   PCR_OR_DUPLICATE or
   SUPPLEMENTARY
 
-type RecordFilter = ref object
+type RecordFilter* = ref object
   ## The 'RecordFilter' object.
   bam: Bam
   ignoreFlag: uint16
-  chromosomeName: string
+  chromosomeName*: string
 
 proc newRecordFilter*(bam: Bam, chromosomeName: string,
                       ignoreFlags: varargs[uint16]): RecordFilter =

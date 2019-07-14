@@ -62,10 +62,4 @@ otherwise skew results (coverage etc.)
 
 - pileup: allow to specify region
 - pileup: allow pileup without reference
-- pileup: don't parse reference for chroms without data (currently parses all in header). best to
-  parse fai to algorithm.pileup
-- pileup: fix `../lofreq3.git/lofreq pileup -b chr20-40000001-45000000.bam -f GRCh38_full_analysis_set_plus_decoy_hla.fa >/dev/null`
-  - beginning <= position` The file is not sorted: 40002361 40002362 [AssertionError]
-  - `47ea7271-d86d-4e27-b421-39b95e056f89_Basecall_Alignment_template        16      chr20    40002363        0       3078S3I...`
-  - classify as invalid CIGAR?
 - add tests for invalid cigar ops: ^[ID] and ^[S][ID}

@@ -10,7 +10,6 @@ import os
 import hts
 import interfaces/iSequence
 import storage/slidingDeque
-import processor
 import recordFilter
 import algorithm
 import pipetools
@@ -30,28 +29,20 @@ proc full_pileup*(bamFname: string, faFname: string, ignBQ2: bool,
   var bam: Bam
   var fai: Fai
 
-  if not open(fai, faFname):
-    quit("Could not open fasta file.")
-
   if not open(bam, bamFname, index=true):
-    quit("Could not open BAM file.")
+    quit("Could not open BAM file " & bamFname)
 
+  if not open(fai, faFname):
+    quit("Could not open reference " & faFname)
+
+  # FIXME in-lieu of region
   for chromosome in targets(bam.hdr):
-    let name = chromosome.name
-    var time: float
+    var records = newRecordFilter(bam, chromosome.name)
 
-    var records = newRecordFilter(bam, name)
-    
-    time = cpuTime()
-    var reference = fai.loadSequence(name)
-    info("Time taken to load reference ", name, " ", cpuTime() - time)
+    let time = cpuTime()
+    algorithm.pileup(fai, records, handler, ignBQ2)
+    info("Time taken to pileup reference ", chromosome.name, " ", cpuTime() - time)
 
-    var storage = newSlidingDeque(name, handler)
-    var processor = newProcessor(storage, ignBQ2)
-    
-    time = cpuTime()
-    algorithm.pileup(records, reference, processor)
-    info("Time taken to pileup reference ", name, " ", cpuTime() - time)
 
 proc pileup*(bamFname: string, faFname: string, ignBQ2: bool = false) =
   full_pileup(bamFname, faFname, ignBQ2, toJson.then(print))

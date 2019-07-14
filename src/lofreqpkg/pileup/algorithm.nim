@@ -8,6 +8,13 @@
 
 
 import hts
+import recordFilter
+import interfaces/iSequence
+import storage/slidingDeque
+import processor
+import storage/slidingDeque
+import os
+
 
 proc allowed(operation: CigarOp): bool {.inline.} =
   ## Determines whether a cigar operation is allowed or not.
@@ -72,25 +79,22 @@ proc valid(cigar: Cigar): bool {.inline.} =
         result = false
 
 
-proc pileup*[TSequence, TRecordIterable, TProcessor](reads: TRecordIterable,
-                                                     reference: TSequence,
-                                                     processor: var TProcessor
-                                                    ): void {.inline.} =
-  ## Performs a pileup over all reads provided by the read iterable parameter
-  ## and the passes all relevant information to the provided 'processor' object
-  ## which is in charge of processing the operations.
-  ## The parameter `reads` is an iterable (has an `items` method) yielding all
-  ## reads which to be piled up. It must yield objects of type 'Bam.Record'.
-  ## The parameter `reference` is an interface for accessing the reference
-  ## sequence.
-  ## The parameter `processor` must provide an implementation of the event
-  ## processing methods.
-  for read in reads:
-      #echo "DEBUG ", read.name
+proc pileup*(fai: Fai, records: RecordFilter, handler: DataToVoid, ignBQ2: bool): void {.inline.} =
+  ## Performs a pileup over all reads provided by records
+
+  var reference: ISequence
+  var storage = newSlidingDeque(records.chromosomeName, handler)
+  var processor = newProcessor(storage, ignBQ2)
+
+  for read in records:
+      # all records come from the same chromosome as guarantted by RecordFilter
+      # load reference only after we're sure there's data to process
+      if reference.len == 0:
+        reference = fai.loadSequence(records.chromosomeName)
       let cigar = read.cigar
 
       if not cigar.valid:
-        # Skipping all invalid reads (e.g. beginning with deletions/insertions)
+        # Skipping all invalid reads
         writeLine(stderr, "WARNING: Skipping read with invalid CIGAR: " & $read)
         continue
 
