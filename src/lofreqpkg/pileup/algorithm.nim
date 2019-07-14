@@ -1,7 +1,7 @@
 ## The module implements a pileup algorithm performed over a single chromosome
 ## and its reads. It serves as a template and defines only the basic procedure
 ## for iterating over the CIGAR strings of BAM records. The processing itself
-## is defined by an outside object. 
+## is defined by an outside object.
 ##
 ## - Author: Filip Sodić <filip.sodic@gmail.com>
 ## - License: The MIT License
@@ -29,16 +29,16 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
   ## read and the reference respectively. After processing the event, the 
   ## procedure returns the new offsets as a tuple.
   let operation = event.op
-  
+
   if not operation.allowed:
     raise newException(ValueError, "Invalid operation: " & $operation)
 
   if operation == soft_clip:
     # a soft clip is not processed but advaces the position on the read
     return (readOffset + event.len, refOffset)
-  
+
   let consumes = event.consumes()
-  
+
   if consumes.query and consumes.reference:
     # mutual, process all matches
     processor.processMatches(readOffset, refOffset, event.len,
@@ -64,25 +64,29 @@ proc valid(cigar: Cigar): bool {.inline.} =
   ## Tests whether a CIGAR is valid.
   ## Returns true if the CIGAR is valid, false otherwise.
   ## todo check the rest of the cigar to prevent later exceptions
-  case cigar[0].op
-    of CigarOp.insert, CigarOp.deletion: false
-    else: true 
+  result = true
+  if cigar[0].op in [CigarOp.insert, CigarOp.deletion]:
+    result = false
+  elif cigar[0].op == CigarOp.soft_clip:
+    if len(cigar)>1 and cigar[1].op in [CigarOp.insert, CigarOp.deletion]:
+        result = false
 
-    
+
 proc pileup*[TSequence, TRecordIterable, TProcessor](reads: TRecordIterable,
                                                      reference: TSequence,
                                                      processor: var TProcessor
                                                     ): void {.inline.} =
-  ## Performs a pileup over all reads provided by the read iterable parameter 
+  ## Performs a pileup over all reads provided by the read iterable parameter
   ## and the passes all relevant information to the provided 'processor' object
   ## which is in charge of processing the operations.
   ## The parameter `reads` is an iterable (has an `items` method) yielding all
   ## reads which to be piled up. It must yield objects of type 'Bam.Record'.
   ## The parameter `reference` is an interface for accessing the reference
   ## sequence.
-  ## The parameter `processor` must provide an implementation of the event 
-  ## processing methods. 
+  ## The parameter `processor` must provide an implementation of the event
+  ## processing methods.
   for read in reads:
+      #echo "DEBUG ", read.name
       let cigar = read.cigar
 
       if not cigar.valid:
@@ -90,19 +94,19 @@ proc pileup*[TSequence, TRecordIterable, TProcessor](reads: TRecordIterable,
         writeLine(stderr, "WARNING: Skipping read with invalid CIGAR: " & $read)
         continue
 
-      var 
+      var
         readOffset = 0
         refOffset = read.start
-      
+
       # tell the processor that the new read is about to start
       processor.beginRead(read.start)
-      
-      # process all events on the read 
+
+      # process all events on the read
       for event in cigar:
         (readOffset, refOffset) =
           processEvent(event, processor, read, reference,
                        readOffset, refOffset)
 
-  # inform the processor that the pileup is done      
+  # inform the processor that the pileup is done
   processor.done()
 
