@@ -23,8 +23,7 @@ import logging
 # is there not way to set the fmtStr of the default handler?
 
 
-proc full_pileup*(bamFname: string, faFname: string, ignBQ2: bool,
-                  handler: DataToVoid) : void =
+proc full_pileup*(bamFname: string, faFname: string, handler: DataToVoid) : void =
   ## Performs the pileup over all chromosomes listed in the bam file.
   var bam: Bam
   var fai: Fai
@@ -40,12 +39,13 @@ proc full_pileup*(bamFname: string, faFname: string, ignBQ2: bool,
     var records = newRecordFilter(bam, chromosome.name)
 
     let time = cpuTime()
-    algorithm.pileup(fai, records, handler, ignBQ2)
+    algorithm.pileup(fai, records, handler)
     info("Time taken to pileup reference ", chromosome.name, " ", cpuTime() - time)
 
 
-proc pileup*(bamFname: string, faFname: string, ignBQ2: bool = false) =
-  full_pileup(bamFname, faFname, ignBQ2, toJson.then(print))
+proc pileup*(bamFname: string, faFname: string) =
+  #full_pileup(bamFname, faFname, doNothing)
+  full_pileup(bamFname, faFname, toJson.then(print))
 
 
 when isMainModule:

@@ -43,8 +43,7 @@ type Processor[TStorage] = ref object
 proc newProcessor*[TStorage](storage: TStorage,
                              matchQuality: TQualityProc,
                              insertionQuality: TQualityProc,
-                             deletionQuality: TQualityProc,
-                             ignBQ2= false
+                             deletionQuality: TQualityProc
                             ): Processor[TStorage] {.inline.} =
   ## Creates a new 'Processor'. The operation quality is calculated using the
   ## provided functions. The processor stores and updates the data in the
@@ -54,25 +53,16 @@ proc newProcessor*[TStorage](storage: TStorage,
                       matchQualityAt: matchQuality,
                       insertionQualityAt: insertionQuality,
                       deletionQualityAt: deletionQuality,
-                      ignBQ2= false
                      )
 
 
-proc matchQualityAt_Default(r: Record, i: int): int =
-  int(r.baseQualityAt(i))
-
-
-proc matchQualityAt_ignBQ2(r: Record, i: int): int =
-  let q = int(r.baseQualityAt(i))
-  if q==2: -1 else: q
-
-
-proc newProcessor*[TStorage](storage: TStorage, ignBQ2= false):
+proc newProcessor*[TStorage](storage: TStorage):
                               Processor[TStorage] {.inline.} =
   ## The default constructor for the 'Processor' type.
   #FIXME use varargs to pass parameters down?
   Processor[TStorage](storage: storage,
-                      matchQualityAt: if ignBQ2: matchQualityAt_ignBQ2 else: matchQualityAt_Default,
+                      matchQualityAt: proc(r: Record, i: int): int =
+                        int(r.baseQualityAt(i)),
                       insertionQualityAt: proc(r: Record, i: int): int =
                         DEFAULT_INSERTION_QUALITY,
                       deletionQualityAt: proc(r: Record, i: int): int =

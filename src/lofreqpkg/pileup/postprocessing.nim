@@ -26,3 +26,6 @@ proc toJson*(data: PositionData): JsonNode =
   ## Converts the given PositionData object into a JsonNode.
   %data
 
+proc doNothing*(data: PositionData): void =
+  discard true
+

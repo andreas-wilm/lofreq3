@@ -79,12 +79,12 @@ proc valid(cigar: Cigar): bool {.inline.} =
         result = false
 
 
-proc pileup*(fai: Fai, records: RecordFilter, handler: DataToVoid, ignBQ2: bool): void {.inline.} =
+proc pileup*(fai: Fai, records: RecordFilter, handler: DataToVoid): void {.inline.} =
   ## Performs a pileup over all reads provided by records
 
-  var reference: ISequence
+  var reference: ISequence# our own type, hence using loadSequence below
   var storage = newSlidingDeque(records.chromosomeName, handler)
-  var processor = newProcessor(storage, ignBQ2)
+  var processor = newProcessor(storage)
 
   for read in records:
       # all records come from the same chromosome as guarantted by RecordFilter
