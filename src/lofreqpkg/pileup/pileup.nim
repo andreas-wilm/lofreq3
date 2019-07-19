@@ -23,7 +23,7 @@ import logging
 # is there not way to set the fmtStr of the default handler?
 
 
-proc full_pileup*(bamFname: string, faFname: string, handler: DataToVoid) : void =
+proc full_pileup*(bamFname: string, faFname = "", handler: DataToVoid) : void =
   ## Performs the pileup over all chromosomes listed in the bam file.
   var bam: Bam
   var fai: Fai
@@ -31,8 +31,12 @@ proc full_pileup*(bamFname: string, faFname: string, handler: DataToVoid) : void
   if not open(bam, bamFname, index=true):
     quit("Could not open BAM file " & bamFname)
 
-  if not open(fai, faFname):
-    quit("Could not open reference " & faFname)
+  if len(faFname)!=0:
+    info("Opening index for " & faFname)
+    if not open(fai, faFname):
+      quit("Could not open reference " & faFname)
+  else:
+    info("No reference file given")
 
   # FIXME in-lieu of region
   for chromosome in targets(bam.hdr):
@@ -43,7 +47,7 @@ proc full_pileup*(bamFname: string, faFname: string, handler: DataToVoid) : void
     info("Time taken to pileup reference ", chromosome.name, " ", cpuTime() - time)
 
 
-proc pileup*(bamFname: string, faFname: string) =
+proc pileup*(bamFname: string, faFname = "") =
   #full_pileup(bamFname, faFname, doNothing)
   full_pileup(bamFname, faFname, toJson.then(print))
 

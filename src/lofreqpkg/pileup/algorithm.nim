@@ -91,6 +91,7 @@ proc pileup*(fai: Fai, records: RecordFilter, handler: DataToVoid): void {.inlin
       # load reference only after we're sure there's data to process
       if reference.len == 0:
         reference = fai.loadSequence(records.chromosomeName)
+       
       let cigar = read.cigar
 
       if not cigar.valid:
