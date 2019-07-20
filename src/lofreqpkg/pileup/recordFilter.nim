@@ -38,8 +38,11 @@ type RecordFilter* = ref object
   bam: Bam
   ignoreFlag: uint16
   chromosomeName*: string
+  startIdx*: uint
+  endIdx*: uint
 
-proc newRecordFilter*(bam: Bam, chromosomeName: string,
+proc newRecordFilter*(bam: Bam, chromosomeName: string, 
+                      startIdx: uint, endIdx: uint,
                       ignoreFlags: varargs[uint16]): RecordFilter =
   ## Constructs a new 'RecordFilter' object. The reads that are allowed through
   ## the filter: 
@@ -55,12 +58,13 @@ proc newRecordFilter*(bam: Bam, chromosomeName: string,
       finalFlag = finalFlag or flag
   
   return RecordFilter(bam: bam, chromosomeName: chromosomeName,
-               ignoreFlag: finalFlag)
+                      startIdx: startIdx, endIdx: endIdx,
+                      ignoreFlag: finalFlag)
 
 
 iterator items*(self: RecordFilter) : Record =
   ## Enables transparent iteration in for..in loops. Makes any 'RecordFilter'
   ## object an iterable. This method should in most cases be called implicitly.
-  for read in self.bam.query(self.chromosomeName):
+  for read in self.bam.query(self.chromosomeName, int(self.startIdx), int(self.endIdx)):
     if (read.flag and self.ignoreFlag) == 0:
       yield read
