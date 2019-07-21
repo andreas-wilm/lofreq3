@@ -32,6 +32,7 @@ const DEFAULT_BLANK_SYMBOL = '*' # missing position symbol
 ## custom fields.
 type TQualityProc = proc (r: Record, i: int): int
 
+
 type Processor[TStorage] = ref object
   ## The 'Processor' type. Its fields are configuration options.
   storage: TStorage
@@ -78,11 +79,8 @@ proc processMatches*[TSequence](self: Processor,
   for offset in countUp(0, length - 1):
     let refOff = refStart + offset
     let readOff = readStart + offset
-    # q == -1 is filtering signal
-    let bq = self.matchQualityAt(read, readOff)
-    if bq != -1:
-      self.storage.recordMatch(refOff, read.baseAt(readOff),
-                               bq,
+    self.storage.recordMatch(refOff, read.baseAt(readOff),
+                               self.matchQualityAt(read, readOff),
                                read.flag.reverse,
                                reference.baseAt(refOff))
 
@@ -127,6 +125,7 @@ proc beginRead*(self: Processor, start: int): void {.inline.} =
   ## Performs what is necessary before starting a new read. In this case,
   ## this means flushing the storage up to the starting position.
   discard self.storage.flushUpTo(start)
+
 
 proc done*(self: Processor): void {.inline.} =
   ## Finishes the processing, flushes the entire storage.

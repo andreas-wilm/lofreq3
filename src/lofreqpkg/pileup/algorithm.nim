@@ -14,6 +14,7 @@ import storage/slidingDeque
 import processor
 import storage/slidingDeque
 import os
+import ../region
 
 
 proc allowed(operation: CigarOp): bool {.inline.} =
@@ -22,6 +23,15 @@ proc allowed(operation: CigarOp): bool {.inline.} =
   case operation
     of hard_clip, ref_skip, pad: false
     else: true
+
+
+proc withinRegion(refOffset: int, region: Region): bool =
+  if refOffset < region.s or refOffset > region.e:
+    echo "outsideRegion ", $refOffset, " ", region
+    return false
+  else:
+    echo "withinRegion ", $refOffset, " ", region
+    return true
 
 
 proc processEvent[TSequence, TProcessor](event: CigarElement,
@@ -49,19 +59,19 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
   if consumes.query and consumes.reference:
     # mutual, process all matches
     processor.processMatches(readOffset, refOffset, event.len,
-                  read, reference)
+                    read, reference)
     return (readOffset + event.len, refOffset + event.len)
 
   if consumes.reference:
     # reference only, process deletion
     processor.processDeletion(readOffset, refOffset, event.len,
-                   read, reference)
+                     read, reference)
     return (readOffset, refOffset + event.len)
 
   if consumes.query:
     # read only, process insertion
     processor.processInsertion(readOffset, refOffset, event.len,
-                    read, reference)
+                      read, reference)
     return (readOffset + event.len, refOffset)
 
   raise newException(ValueError, "Operation does not consume anything.")
@@ -79,11 +89,11 @@ proc valid(cigar: Cigar): bool {.inline.} =
         result = false
 
 
-proc pileup*(fai: Fai, records: RecordFilter, handler: DataToVoid): void {.inline.} =
+proc pileup*(fai: Fai, records: RecordFilter, region: Region, handler: DataToVoid): void {.inline.} =
   ## Performs a pileup over all reads provided by records
 
   var reference: ISequence# our own type, hence using loadSequence below
-  var storage = newSlidingDeque(records.chromosomeName, handler)
+  var storage = newSlidingDeque(records.chromosomeName, region, handler)
   var processor = newProcessor(storage)
 
   for read in records:

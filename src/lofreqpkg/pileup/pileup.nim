@@ -17,21 +17,17 @@ import postprocessing
 import times
 import logging
 import strutils
-import nre
-import strformat
+import ../region
 
-#var L = newConsoleLogger(fmtStr = verboseFmtStr)
-#addHandler(L)
+
+#var consoleLog = newConsoleLogger(fmtStr = verboseFmtStr)
+#addHandler(consoleLog)
+# FIXME info,warn templates etc log twice after this
+# Log directly via consoleLog.(lvlInfo, message) 
+
+#let defaultHandler = getHandlers()[0]
 # is there not way to set the fmtStr of the default handler?
-
-type Region* = object
-  sq*: string
-  s*: uint
-  e*: uint
-
-
-proc `$`*(r: Region): string =
-  fmt"{r.sq}:{r.s+1}-{r.e}"
+# defaultHandler.useStderr = true FIXME only support in >= 0.20 ?
 
 
 proc auto_fill_region*(reg: Region, targets: seq[Target]): Region = 
@@ -40,31 +36,12 @@ proc auto_fill_region*(reg: Region, targets: seq[Target]): Region =
   for t in targets:
     if t.name == reg.sq:
       result.s = 0
-      result.e = t.length
+      result.e = (int)t.length
       foundTarget = true
       break
   if not foundTarget:
     raise newException(ValueError, "Couldn't find " & reg.sq & " in BAM header. Valid entries are " & $targets)
 
-
-proc reg_from_str*(regStr: string): Region =
-  var matches = regStr.match(re"(\w+):(\d+)-(\d+)")
-  if matches.isSome:
-    # chr:start-end 
-    result.sq = matches.get.captures[0]
-    # FIXME test correct boundaries
-    result.s = matches.get.captures[1].parseUInt-1
-    result.e = matches.get.captures[2].parseUInt
-    doAssert result.s < result.e
-  else:
-    # chrom only 
-    doAssert regStr.contains(':') == false# FIXME proper error message
-    result.sq = regStr
-    # s=e means no indices given
-    result.s = 0
-    result.e = 0  
-  doAssert len(result.sq)>0
-  
 
 proc full_pileup*(bamFname: string, regions = "", faFname = "", handler: DataToVoid) : void =
   ## Performs the pileup over all chromosomes listed in the bam file.
@@ -81,8 +58,6 @@ proc full_pileup*(bamFname: string, regions = "", faFname = "", handler: DataToV
   else:
     info("No reference file given")
 
-  warn("pileup over all reads overlapping region, i.e even outside region. would need to skip cigar for as long we're outside or filter json")
-
   for regstr in regions.split(','):
     var reg = reg_from_str(reg_str)
 
@@ -94,7 +69,7 @@ proc full_pileup*(bamFname: string, regions = "", faFname = "", handler: DataToV
     var records = newRecordFilter(bam, reg.sq, reg.s, reg.e)
 
     let time = cpuTime()
-    algorithm.pileup(fai, records, handler)
+    algorithm.pileup(fai, records, reg, handler)
     info("Time taken to pileup reference ", reg.sq, " ", cpuTime() - time)
 
 

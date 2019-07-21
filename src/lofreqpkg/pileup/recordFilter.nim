@@ -9,6 +9,7 @@
 
 import hts
 
+
 ## All the possible flags for the records. Use this instead of raw numbers
 # FIXME: an enum might be a better fit for this
 const PAIRED_READ*           = 1
@@ -24,6 +25,7 @@ const FAILS_VENDOR_CHECK*    = 512
 const PCR_OR_DUPLICATE*      = 1024
 const SUPPLEMENTARY*         = 2048
 
+
 ## All the flags which are ignored by default. If no flags are specified in the
 ## constructor, use this. 
 const DEFAULT_IGNORE_FLAGS*: uint16 =
@@ -33,16 +35,18 @@ const DEFAULT_IGNORE_FLAGS*: uint16 =
   PCR_OR_DUPLICATE or
   SUPPLEMENTARY
 
+
 type RecordFilter* = ref object
   ## The 'RecordFilter' object.
   bam: Bam
   ignoreFlag: uint16
   chromosomeName*: string
-  startIdx*: uint
-  endIdx*: uint
+  startIdx*: int
+  endIdx*: int
+
 
 proc newRecordFilter*(bam: Bam, chromosomeName: string, 
-                      startIdx: uint, endIdx: uint,
+                      startIdx: int, endIdx: int,
                       ignoreFlags: varargs[uint16]): RecordFilter =
   ## Constructs a new 'RecordFilter' object. The reads that are allowed through
   ## the filter: 

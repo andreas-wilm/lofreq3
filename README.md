@@ -60,8 +60,7 @@ otherwise skew results (coverage etc.)
 
 # To Do List
 
-- pileup: allow to specify region
-- pileup: allow pileup without reference
+- pileup: record read start and end
 - add tests for invalid cigar ops: `^[ID]` and `^[S][ID]`
 - pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release
   mode

@@ -13,6 +13,7 @@ import deques
 import containers/positionData
 import math
 import ../pipetools
+import ../../region
 
 
 ## Defines a type of the expected submit procedure. It should consume a
@@ -25,7 +26,7 @@ type DataToVoid* =  proc(data: PositionData): void
 type DataToType*[T] =  proc(data: PositionData): T
 
 
-# NOTE: The quue does not really need to be double ended, but the 'Queue'
+# NOTE: The queue does not really need to be double ended, but the 'Queue'
 # module is deprecated.
 type SlidingDeque* = ref object
   ## Defines a 'SlidingDeque' type and its relevant fields.
@@ -36,12 +37,20 @@ type SlidingDeque* = ref object
   chromosome: string
   # Having the chromosome as a a field on the storage object is certainly less
   # than ideal. I will probably change this to be injected later.
+  region: Region# FIXME this is a stupid hack to avoid submission of positions outside of region
 
 
-const DEFAULT_INITIAL_SIZE = 200
+const DEFAULT_INITIAL_SIZE = 200# FIXME autoset from readlength?
 
 
-proc newSlidingDeque*(chromosome: string, submit: DataToVoid,
+proc posWithinRegion(pos: PositionData, reg: Region): bool =
+  if pos.refIndex <= reg.s or pos.refIndex > reg.e:
+    return false
+  else:
+    return true
+
+
+proc newSlidingDeque*(chromosome: string, region: Region, submit: DataToVoid,
                       initialSize: int = DEFAULT_INITIAL_SIZE
                      ): SlidingDeque {.inline.} =
   ## Constructs a new 'SlidingDeque' object. 
@@ -58,7 +67,8 @@ proc newSlidingDeque*(chromosome: string, submit: DataToVoid,
     submit: submit,
     initialSize: adjustedSize,
     beginning: 0,
-    chromosome: chromosome
+    chromosome: chromosome,
+    region: region
   )
 
 
@@ -77,9 +87,10 @@ proc newSlidingDeque*(chromosome: string, submit: DataToType,
 proc submitDeq(self: SlidingDeque,
                deq: var Deque[PositionData]): void {.inline.} =
   # FIXME: implement asyncronous procedure (probably outside of this module)
-  # Submits the current deque for furhter processing
-  for element in deq:
-    self.submit(element)
+  # Submits the current deque for further processing
+  for pd in deq:
+    if posWithinRegion(pd, self.region):
+      self.submit(pd)
 
 
 proc resetDeq(self: SlidingDeque, beginning: int): void {.inline.} =
@@ -177,7 +188,9 @@ proc flushUpTo*(self: SlidingDeque, position: int): int {.inline.} =
     return result
 
   while self.beginning < position:
-    self.submit(self.deq.popFirst())
+    let pd = self.deq.popFirst()
+    if posWithinRegion(pd, self.region):
+      self.submit(pd)
     self.beginning.inc
     result.inc
 

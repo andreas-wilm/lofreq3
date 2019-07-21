@@ -10,13 +10,15 @@
 ## - Author: Filip Sodić <filip.sodic@gmail.com>
 ## - License: The MIT License
 
+
 import operationData
 import json
+
 
 type PositionData* = ref object
     ## The 'PositionData' object keeping all information concerning one parti-
     ## cular position on the reference.
-    refIndex: int
+    refIndex*: int
     refBase: char
     chromosome: string
     matches: OperationData[char]
