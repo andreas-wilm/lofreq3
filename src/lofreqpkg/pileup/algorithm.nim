@@ -25,15 +25,6 @@ proc allowed(operation: CigarOp): bool {.inline.} =
     else: true
 
 
-proc withinRegion(refOffset: int, region: Region): bool =
-  if refOffset < region.s or refOffset > region.e:
-    echo "outsideRegion ", $refOffset, " ", region
-    return false
-  else:
-    echo "withinRegion ", $refOffset, " ", region
-    return true
-
-
 proc processEvent[TSequence, TProcessor](event: CigarElement,
                   processor: var TProcessor,
                   read: Record, reference: TSequence,

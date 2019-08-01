@@ -12,7 +12,6 @@ import interfaces/iSequence
 import storage/slidingDeque
 import recordFilter
 import algorithm
-import pipetools
 import postprocessing
 import times
 import logging
@@ -75,7 +74,7 @@ proc full_pileup*(bamFname: string, regions = "", faFname = "", handler: DataToV
 
 proc pileup*(bamFname: string, regions: string, faFname = "") =
   #full_pileup(bamFname, faFname, doNothing)
-  full_pileup(bamFname, regions, faFname, toJson.then(print))
+  full_pileup(bamFname, regions, faFname, toJsonAndPrint)
 
 
 when isMainModule:
