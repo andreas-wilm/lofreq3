@@ -19,14 +19,7 @@ import strutils
 import ../region
 
 
-#var consoleLog = newConsoleLogger(fmtStr = verboseFmtStr)
-#addHandler(consoleLog)
-# FIXME info,warn templates etc log twice after this
-# Log directly via consoleLog.(lvlInfo, message) 
-
-#let defaultHandler = getHandlers()[0]
-# is there not way to set the fmtStr of the default handler?
-# defaultHandler.useStderr = true FIXME only support in >= 0.20 ?
+var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
 
 proc auto_fill_region*(reg: Region, targets: seq[Target]): Region = 
@@ -51,11 +44,11 @@ proc full_pileup*(bamFname: string, regions = "", faFname = "", handler: DataToV
     quit("Could not open BAM file " & bamFname)
 
   if len(faFname)!=0:
-    info("Opening index for " & faFname)
+    logger.log(lvlInfo, "Opening index for " & faFname)
     if not open(fai, faFname):
       quit("Could not open reference " & faFname)
   else:
-    info("No reference file given")
+    logger.log(lvlInfo, "No reference file given")
 
   for regstr in regions.split(','):
     var reg = reg_from_str(reg_str)
@@ -63,7 +56,7 @@ proc full_pileup*(bamFname: string, regions = "", faFname = "", handler: DataToV
     if reg.s == 0 and reg.e == 0:# only sq given instead of full region
       var targets = targets(bam.hdr)
       reg = auto_fill_region(reg, targets)
-    info("Starting pileup for " & $reg)
+    logger.log(lvlInfo, "Starting pileup for " & $reg)
 
     var records = newRecordFilter(bam, reg.sq, reg.s, reg.e)
 

@@ -14,9 +14,13 @@ import storage/slidingDeque
 import processor
 import storage/slidingDeque
 import os
+import logging
 import ../region
 
 
+var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
+
+        
 proc allowed(operation: CigarOp): bool {.inline.} =
   ## Determines whether a cigar operation is allowed or not.
   ## Returns true if allowed, false otherwise.
@@ -97,7 +101,7 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region, handler: DataToVoi
 
       if not cigar.valid:
         # Skipping all invalid reads
-        writeLine(stderr, "WARNING: Skipping read with invalid CIGAR: " & $read)
+        logger.log(lvlWarn, "Skipping read with invalid CIGAR: " & $read)
         continue
 
       var
