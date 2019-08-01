@@ -4,8 +4,11 @@
 ## - Author: Filip Sodić <filip.sodic@gmail.com>
 ## - License: The MIT License
 
-import storage/containers/positionData
+# standard
 import json
+# third party
+# project specific
+import storage/containers/positionData
 
 
 proc toJson*(data: PositionData): JsonNode =

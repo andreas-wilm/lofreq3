@@ -6,6 +6,7 @@
 ## - Author: Filip Sodić <filip.sodic@gmail.com>
 ## - License: The MIT License
 
+# standard
 import os
 import hts
 import interfaces/iSequence
@@ -16,6 +17,8 @@ import postprocessing
 import times
 import logging
 import strutils
+
+# project specific
 import ../region
 
 

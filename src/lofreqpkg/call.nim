@@ -9,7 +9,6 @@ import json
 import utils
 import math
 import strutils
-import logging
 
 # third party
 from hts/stats import fishers_exact_test
@@ -29,12 +28,6 @@ type PositionData = object
     matches: QualHist
     deletions: QualHist
     insertions: QualHist
-
-
-# From the docs "Warning: The global list of handlers is a thread var,
-# # this means that the handlers must be re-added in each thread."
-var L = newConsoleLogger()
-addHandler(L)
 
 
 ## brief Computes log(exp(logA) + exp(logB))
@@ -158,14 +151,14 @@ proc parsePlpJson(jsonString: string): PositionData =
   # FIXME should we validate the keys before starting to parse?
   # what about extra keys for example. should they be ignored?
 
-  result.chromosome = dataJson["chromosome"].getStr
-  result.refIndex =  dataJson["refIndex"].getInt
+  result.chromosome = dataJson["CHROM"].getStr
+  result.refIndex =  dataJson["POS"].getInt
   # could ignore lower case (masking) here if needed as feature
-  result.refBase = dataJson["refBase"].getStr[0].toUpperAscii()
+  result.refBase = dataJson["REF"].getStr[0].toUpperAscii()
 
-  result.matches = parseOperationData(dataJson["matches"])
-  result.insertions = parseOperationData(dataJson["insertions"])
-  result.deletions = parseOperationData(dataJson["deletions"])
+  result.matches = parseOperationData(dataJson["M"])
+  result.insertions = parseOperationData(dataJson["I"])
+  result.deletions = parseOperationData(dataJson["D"])
 
 
 proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,

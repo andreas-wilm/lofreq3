@@ -7,15 +7,18 @@
 ## - License: The MIT License
 
 
+# standard
+import os
+import logging
+# third party
 import hts
+# project specific
+import ../region
 import recordFilter
 import interfaces/iSequence
 import storage/slidingDeque
 import processor
 import storage/slidingDeque
-import os
-import logging
-import ../region
 
 
 var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)

@@ -11,8 +11,11 @@
 ## - License: The MIT License
 
 
-import operationData
+# standard
 import json
+# third party
+# project specific
+import operationData
 
 
 type PositionData* = ref object
@@ -81,10 +84,10 @@ proc addDeletion*(self: var PositionData, bases: string, quality: int,
 
 proc `%`*(self: PositionData): JsonNode {.inline.} =
   %{
-    "chromosome": %self.chromosome,
-    "refIndex": %self.refIndex,
-    "refBase": %($self.refBase),
-    "matches": %self.matches,
-    "insertions": %self.insertions,
-    "deletions": %self.deletions
+    "CHROM": %self.chromosome,
+    "POS": %self.refIndex,
+    "REF": %($self.refBase),
+    "M": %self.matches,
+    "I": %self.insertions,
+    "D": %self.deletions
   }
