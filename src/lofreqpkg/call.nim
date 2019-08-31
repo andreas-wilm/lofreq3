@@ -9,10 +9,8 @@ import json
 import utils
 import math
 import strutils
-
 # third party
 from hts/stats import fishers_exact_test
-
 # project specific
 import vcf
 

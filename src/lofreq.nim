@@ -1,5 +1,8 @@
+# standard
 import cligen
-
+#import nimprof
+# third party
+# project specific
 import lofreqpkg/call as lofreq_call
 import lofreqpkg/pileup/pileup as lofreq_pileup
 # cannot be called 'call', otherwise you get an error from cligen:
@@ -9,5 +12,6 @@ when isMainModule:
   dispatch_multi(
     [call, help={"plpFname": "Pileup file name (LoFreq JSON format)"}],
     [pileup, help={"bamFname": "BAM file",
+                    "noMQ": "Ignore mapping quality",
                     "faFname": "Fasta reference (indexed)"}]
   )

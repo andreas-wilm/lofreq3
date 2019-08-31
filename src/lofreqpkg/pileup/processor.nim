@@ -12,8 +12,10 @@
 ## - Author: Filip Sodic <filip.sodic@gmail.com>
 ## - License: The MIT License
 
-import hts
 import strutils
+import math
+
+import hts
 
 
 # placeholders until we find a way to record true qualities
@@ -30,7 +32,7 @@ const DEFAULT_BLANK_SYMBOL = '*' # missing position symbol
 ## base.  Hovewer, this should not really make a difference since, in most
 ## cases, all deletion and insertion quality data is found in the record's
 ## custom fields.
-type TQualityProc = proc (r: Record, i: int): int
+type TQualityProc = proc (r: Record, i: int, useMQ: bool): int
 
 
 type Processor[TStorage] = ref object
@@ -39,35 +41,70 @@ type Processor[TStorage] = ref object
   matchQualityAt: TQualityProc
   deletionQualityAt: TQualityProc
   insertionQualityAt: TQualityProc
+  useMQ: bool
 
 
-proc newProcessor*[TStorage](storage: TStorage,
-                             matchQuality: TQualityProc,
-                             insertionQuality: TQualityProc,
-                             deletionQuality: TQualityProc
-                            ): Processor[TStorage] {.inline.} =
-  ## Creates a new 'Processor'. The operation quality is calculated using the
-  ## provided functions. The processor stores and updates the data in the
-  ## provided storage object. All further handling is done by the storage
-  ## object.
-  Processor[TStorage](storage: storage,
-                      matchQualityAt: matchQuality,
-                      insertionQualityAt: insertionQuality,
-                      deletionQualityAt: deletionQuality,
-                     )
+proc phred2prob(phred: int): float =
+  doAssert(phred>=0)
+  pow(10.0, -float(phred)/10.0)
 
 
-proc newProcessor*[TStorage](storage: TStorage):
-                              Processor[TStorage] {.inline.} =
+proc prob2phred(prob: float): int =
+  doAssert(prob>=0.0)
+  int(round(-10.0*log10(prob)))
+ 
+
+proc mergeQuals(q_m: int, q_a: int, q_b: int): int =
+  # FIXME can we do the calculations  in log space?
+  # q_m = mapping quality
+  # q_a = alignment quality
+  # q_b = base / indel quality
+  let p_m = phred2prob(q_m)# mapping error
+  let p_a = phred2prob(q_a)# alignment error
+  let p_b = phred2prob(q_b)# base error
+
+  let p_c = p_m + (1-p_m)*p_a + (1-p_m)*(1-p_a)*p_b
+  prob2phred(p_c)
+
+
+proc matchQual(r: Record, i: int, useMQ: bool): int =
+  var q_m = high(int)
+  let q_a = high(int)# FIXME unsupported
+  let q_b = int(r.baseQualityAt(i))
+  
+  if useMQ:
+    q_m = int(r.mapping_quality)
+  mergeQuals(q_m, q_a, q_b)
+
+
+proc insQual(r: Record, i: int, useMQ: bool): int =
+  var q_m = high(int)
+  let q_a = high(int)# FIXME unsupported
+  let q_b = DEFAULT_INSERTION_QUALITY# FIXME read from record
+  
+  if useMQ:
+    q_m = int(r.mapping_quality)
+  mergeQuals(q_m, q_a, q_b)
+
+
+proc delQual(r: Record, i: int, useMQ: bool): int =
+  var q_m = high(int)
+  let q_a = high(int)# FIXME unsupported
+  let q_b = DEFAULT_DELETION_QUALITY# FIXME read from record
+
+  if useMQ:
+    q_m = int(r.mapping_quality)
+  mergeQuals(q_m, q_a, q_b)
+
+
+proc newProcessor*[TStorage](storage: TStorage, useMQ: bool): 
+  Processor[TStorage] {.inline.} =
   ## The default constructor for the 'Processor' type.
-  #FIXME use varargs to pass parameters down?
   Processor[TStorage](storage: storage,
-                      matchQualityAt: proc(r: Record, i: int): int =
-                        int(r.baseQualityAt(i)),
-                      insertionQualityAt: proc(r: Record, i: int): int =
-                        DEFAULT_INSERTION_QUALITY,
-                      deletionQualityAt: proc(r: Record, i: int): int =
-                        DEFAULT_DELETION_QUALITY)
+                      matchQualityAt: matchQual,
+                      insertionQualityAt: insQual,
+                      deletionQualityAt: delQual,
+                      useMQ: useMQ)
 
 
 proc processMatches*[TSequence](self: Processor,
@@ -80,7 +117,7 @@ proc processMatches*[TSequence](self: Processor,
     let refOff = refStart + offset
     let readOff = readStart + offset
     self.storage.recordMatch(refOff, read.baseAt(readOff),
-                               self.matchQualityAt(read, readOff),
+                               self.matchQualityAt(read, readOff, self.useMQ),
                                read.flag.reverse,
                                reference.baseAt(refOff))
 
@@ -97,7 +134,7 @@ proc processInsertion*[TSequence](self: Processor,
 
   # insertion is reported on the base that preceeds it
   self.storage.recordInsertion(refIndex - 1, value,
-                               self.insertionQualityAt(read, readStart),
+                               self.insertionQualityAt(read, readStart, self.useMQ),
                                read.flag.reverse)
 
 
@@ -117,7 +154,7 @@ proc processDeletion*[TSequence](self: Processor,
 
   # deletion is reported on the base that preceeds it
   self.storage.recordDeletion(refStart - 1, value,
-                              self.deletionQualityAt(read, readIndex),
+                              self.deletionQualityAt(read, readIndex, self.useMQ),
                               read.flag.reverse)
 
 
