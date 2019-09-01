@@ -38,7 +38,8 @@ proc auto_fill_region*(reg: Region, targets: seq[Target]): Region =
     raise newException(ValueError, "Couldn't find " & reg.sq & " in BAM header. Valid entries are " & $targets)
 
 
-proc full_pileup*(bamFname: string, regions = "", faFname = "", useMQ: bool, handler: DataToVoid) : void =
+proc full_pileup*(bamFname: string, faFname = "", regions = "",
+  useMQ: bool, handler: DataToVoid, mincov: Natural, maxcov: Natural) : void =
   ## Performs the pileup over all chromosomes listed in the bam file.
   var bam: Bam
   var fai: Fai
@@ -64,13 +65,13 @@ proc full_pileup*(bamFname: string, regions = "", faFname = "", useMQ: bool, han
     var records = newRecordFilter(bam, reg.sq, reg.s, reg.e)
 
     let time = cpuTime()
-    algorithm.pileup(fai, records, reg, useMQ, handler)
+    algorithm.pileup(fai, records, reg, useMQ, handler, mincov, maxcov)
     info("Time taken to pileup reference ", reg.sq, " ", cpuTime() - time)
 
 
-proc pileup*(bamFname: string, regions: string, noMQ: bool = false, faFname = "") =
+proc pileup*(bamFname: string, regions: string, noMQ: bool = false, faFname = "", mincov = 1, maxcov = high(int)) =
   #full_pileup(bamFname, faFname, doNothing)
-  full_pileup(bamFname, regions, faFname, not noMQ, toJsonAndPrint)
+  full_pileup(bamFname, faFname, regions, not noMQ, toJsonAndPrint, mincov, maxcov)
 
 
 when isMainModule:

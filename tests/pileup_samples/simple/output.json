@@ -1,9 +1,9 @@
 [
 {
-    "chromosome": "ref",
-    "refIndex": 1,
-    "refBase": "A",
-    "matches":
+    "CHROM": "ref",
+    "POS": 1,
+    "REF": "A",
+    "M":
     {
         "A":
         {
@@ -11,16 +11,16 @@
             "255": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 2,
-    "refBase": "A",
-    "matches":
+    "CHROM": "ref",
+    "POS": 2,
+    "REF": "A",
+    "M":
     {
         "A":
         {
@@ -28,16 +28,16 @@
             "255": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 3,
-    "refBase": "C",
-    "matches":
+    "CHROM": "ref",
+    "POS": 3,
+    "REF": "C",
+    "M":
     {
         "A":
         {
@@ -45,16 +45,16 @@
             "255": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 4,
-    "refBase": "A",
-    "matches":
+    "CHROM": "ref",
+    "POS": 4,
+    "REF": "A",
+    "M":
     {
         "A":
         {
@@ -62,9 +62,9 @@
             "255": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {
         "C":
         {
@@ -73,26 +73,26 @@
     }
 },
 {
-    "chromosome": "ref",
-    "refIndex": 5,
-    "refBase": "C",
-    "matches":
+    "CHROM": "ref",
+    "POS": 5,
+    "REF": "C",
+    "M":
     {
         "*":
         {
             "-1": 2
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 6,
-    "refBase": "G",
-    "matches":
+    "CHROM": "ref",
+    "POS": 6,
+    "REF": "G",
+    "M":
     {
         "G":
         {
@@ -100,16 +100,16 @@
             "255": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 7,
-    "refBase": "C",
-    "matches":
+    "CHROM": "ref",
+    "POS": 7,
+    "REF": "C",
+    "M":
     {
         "C":
         {
@@ -118,9 +118,9 @@
             "255": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {
         "CT":
         {
@@ -129,10 +129,10 @@
     }
 },
 {
-    "chromosome": "ref",
-    "refIndex": 8,
-    "refBase": "C",
-    "matches":
+    "CHROM": "ref",
+    "POS": 8,
+    "REF": "C",
+    "M":
     {
         "C":
         {
@@ -144,16 +144,16 @@
             "-1": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 9,
-    "refBase": "T",
-    "matches":
+    "CHROM": "ref",
+    "POS": 9,
+    "REF": "T",
+    "M":
     {
         "T":
         {
@@ -165,16 +165,16 @@
             "-1": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 10,
-    "refBase": "T",
-    "matches":
+    "CHROM": "ref",
+    "POS": 10,
+    "REF": "T",
+    "M":
     {
         "T":
         {
@@ -183,16 +183,16 @@
             "255": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 11,
-    "refBase": "A",
-    "matches":
+    "CHROM": "ref",
+    "POS": 11,
+    "REF": "A",
+    "M":
     {
         "A":
         {
@@ -201,7 +201,7 @@
             "255": 1
         }
     },
-    "insertions":
+    "I":
     {
         "A":
         {
@@ -212,14 +212,14 @@
             "40": 1
         }
     },
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 12,
-    "refBase": "A",
-    "matches":
+    "CHROM": "ref",
+    "POS": 12,
+    "REF": "A",
+    "M":
     {
         "A":
         {
@@ -228,24 +228,24 @@
             "255": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 },
 {
-    "chromosome": "ref",
-    "refIndex": 13,
-    "refBase": "G",
-    "matches":
+    "CHROM": "ref",
+    "POS": 13,
+    "REF": "G",
+    "M":
     {
         "G":
         {
             "29": 1
         }
     },
-    "insertions":
+    "I":
     {},
-    "deletions":
+    "D":
     {}
 }]

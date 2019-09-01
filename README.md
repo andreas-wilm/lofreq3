@@ -117,17 +117,19 @@ otherwise skew results (coverage etc.)
 # To Do List
 
 - Tests, tests, tests
+  - If nimble test is too limiting: https://github.com/ryanlayer/ssshtest
   - add tests for invalid cigar ops: `^[ID]` and `^[S][ID]`
-  - test merging
-  - test quals
+  - test merged qualities against old lofreq
+  - full test against spike in data
   - coverage and SB output in vcf
-  - phred to qual vice versa
 - Performance
   - Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode
 - Add min/max coverage filter to pileup stage
+- Multithreaded pileup and call
 - Documentation:
   - Note on invalid CIGAR ops
   - Explain how it works
+  - Why we force region and how to generate it
 - Enable merging of alignment qualities for bases, ins and dels in processor.nim 
 - Enable use of indel quals in processor.nim 
 - Publish on Github and create issues

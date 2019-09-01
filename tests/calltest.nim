@@ -1,12 +1,14 @@
+# standard library
 import unittest
 import math
 import osproc
 import strutils
-
+import tempfile
+# project specific 
 import ../src/lofreqpkg/call
 import ../src/lofreqpkg/utils
+# third party
 import hts/vcf
-import tempfile
 
 
 # FIXME how to test main function in call (private and nameclash)?
@@ -21,7 +23,7 @@ suite "pileup and call":
     var tmpname: string
     (tmpfd, tmpname) = mkstemp()
     tmpfd.close
-    let plp_cmd = lofreq & " pileup -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa"
+    let plp_cmd = lofreq & " pileup -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 --noMQ"
     let call_cmd = lofreq & " call -p - -m 13"
     let cmd = plp_cmd & " | " & call_cmd & " > " & tmpname
     #echo "Testing: " & cmd
@@ -47,6 +49,7 @@ suite "pileup and call":
         check rec.QUAL == 19
 
     check nvars == 10
+
 
 suite "pvalue computation":
 

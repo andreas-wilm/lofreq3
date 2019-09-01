@@ -12,10 +12,13 @@
 ## - Author: Filip Sodic <filip.sodic@gmail.com>
 ## - License: The MIT License
 
+# standard library
 import strutils
 import math
-
+# third party
 import hts
+# project specific
+import ../utils
 
 
 # placeholders until we find a way to record true qualities
@@ -44,27 +47,17 @@ type Processor[TStorage] = ref object
   useMQ: bool
 
 
-proc phred2prob(phred: int): float =
-  doAssert(phred>=0)
-  pow(10.0, -float(phred)/10.0)
-
-
-proc prob2phred(prob: float): int =
-  doAssert(prob>=0.0)
-  int(round(-10.0*log10(prob)))
- 
-
-proc mergeQuals(q_m: int, q_a: int, q_b: int): int =
+proc mergeQuals*(q_m: int, q_a: int, q_b: int): int =
   # FIXME can we do the calculations  in log space?
   # q_m = mapping quality
   # q_a = alignment quality
   # q_b = base / indel quality
-  let p_m = phred2prob(q_m)# mapping error
-  let p_a = phred2prob(q_a)# alignment error
-  let p_b = phred2prob(q_b)# base error
+  let p_m = qual2prob(q_m)# mapping error
+  let p_a = qual2prob(q_a)# alignment error
+  let p_b = qual2prob(q_b)# base error
 
   let p_c = p_m + (1-p_m)*p_a + (1-p_m)*(1-p_a)*p_b
-  prob2phred(p_c)
+  prob2qual(p_c)
 
 
 proc matchQual(r: Record, i: int, useMQ: bool): int =

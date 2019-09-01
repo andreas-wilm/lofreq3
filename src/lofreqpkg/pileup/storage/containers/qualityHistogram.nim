@@ -25,6 +25,15 @@ func initQualityHistogram*[T](): QualityHistogram[T] {.inline.} =
   initTable[T, CountTable[int]]()
 
 
+proc coverage*[T](table: QualityHistogram[T]): Natural =
+  var s = 0
+  for p1 in table.pairs:
+    #s = p1[1]
+    for p2 in p1[1].pairs:
+      s += p2[1]
+  return s
+
+
 proc add*[T](self: var QualityHistogram[T], value: T,
              quality: int): void {.inline.} =
   ## Accounts for a event with the given value and the given quality.

@@ -29,6 +29,10 @@ type PositionData* = ref object
     insertions: OperationData[string]
 
 
+proc coverage*(pd: PositionData): Natural =
+  coverage(pd.matches) + coverage(pd.deletions) + coverage(pd.insertions)
+
+
 proc newPositionData*(refIndex: int, refBase: char,
                       chromosome: string) : PositionData {.inline.} =
   ## Constructs a new PositionData object keeping the data for

@@ -9,9 +9,12 @@
 ## - Author: Filip Sodić <filip.sodic@gmail.com>
 ## - License: The MIT License
 
+# standard library
+import math
+import strformat
+# project specific
 import deques
 import containers/positionData
-import math
 #import ../pipetools
 import ../../region
 
@@ -38,7 +41,8 @@ type SlidingDeque* = ref object
   # Having the chromosome as a a field on the storage object is certainly less
   # than ideal. I will probably change this to be injected later.
   region: Region# FIXME this is a stupid hack to avoid submission of positions outside of region
-
+  mincov: Natural# FIXME feels wrong here
+  maxcov: Natural# FIXME feels wrong here
 
 const DEFAULT_INITIAL_SIZE = 200# FIXME autoset from readlength?
 
@@ -51,8 +55,7 @@ proc posWithinRegion(pos: PositionData, reg: Region): bool =
 
 
 proc newSlidingDeque*(chromosome: string, region: Region, submit: DataToVoid,
-                      initialSize: int = DEFAULT_INITIAL_SIZE
-                     ): SlidingDeque {.inline.} =
+  mincov: Natural = 0, maxcov: Natural = high(int), initialSize: int = DEFAULT_INITIAL_SIZE): SlidingDeque {.inline.} =
   ## Constructs a new 'SlidingDeque' object. 
   ## The paramater 'submit' is a procedure expected to perform all furhter 
   ## processing. This procedure must be a consumer (not returning anything) of
@@ -61,6 +64,7 @@ proc newSlidingDeque*(chromosome: string, region: Region, submit: DataToVoid,
   ## required wrapping.
   ## There is an optional initial size argument for the queue for optimization
   ## purposes.
+  assert mincov <= maxcov
   let adjustedSize = nextPowerOfTwo(initialSize)
   SlidingDeque(
     deq: initDeque[PositionData](adjustedSize),
@@ -68,20 +72,22 @@ proc newSlidingDeque*(chromosome: string, region: Region, submit: DataToVoid,
     initialSize: adjustedSize,
     beginning: 0,
     chromosome: chromosome,
-    region: region
+    region: region,
+    mincov: mincov,
+    maxcov: maxcov
   )
 
 
-proc newSlidingDeque*(chromosome: string, submit: DataToType,
-                      initialSize: int = DEFAULT_INITIAL_SIZE
-                     ): SlidingDeque {.inline.} =
-  ## Constructs a new 'SlidingDeque' object. 
-  ## The paramater 'submit' is a procedure expected to perform all furhter 
-  ## processing.
-  ## This constructor accepts a procedure mapping a 'PositionData' object to
-  ## any desired type and wraps it into a 'DataToVoid' consumer. There is an
-  ## optional initial size argument for the queue for optimization purposes.
-  newSlidingDeque(initialSize, chromosome, submit.done())
+# proc newSlidingDeque*(chromosome: string, submit: DataToType,
+#                       initialSize: int = DEFAULT_INITIAL_SIZE
+#                      ): SlidingDeque {.inline.} =
+#   ## Constructs a new 'SlidingDeque' object. 
+#   ## The paramater 'submit' is a procedure expected to perform all furhter 
+#   ## processing.
+#   ## This constructor accepts a procedure mapping a 'PositionData' object to
+#   ## any desired type and wraps it into a 'DataToVoid' consumer. There is an
+#   ## optional initial size argument for the queue for optimization purposes.
+#   newSlidingDeque(initialSize, chromosome, submit.done())
 
 
 proc submitDeq(self: SlidingDeque,
@@ -89,8 +95,9 @@ proc submitDeq(self: SlidingDeque,
   # FIXME: implement asyncronous procedure (probably outside of this module)
   # Submits the current deque for further processing
   for pd in deq:
-    if posWithinRegion(pd, self.region):
-      self.submit(pd)
+    let cov = coverage(pd)
+    if posWithinRegion(pd, self.region) and cov >= self.mincov and cov <= self.maxcov:# see also below
+     self.submit(pd)
 
 
 proc resetDeq(self: SlidingDeque, beginning: int): void {.inline.} =
@@ -189,7 +196,8 @@ proc flushUpTo*(self: SlidingDeque, position: int): int {.inline.} =
 
   while self.beginning < position:
     let pd = self.deq.popFirst()
-    if posWithinRegion(pd, self.region):
+    let cov = coverage(pd)
+    if posWithinRegion(pd, self.region) and cov >= self.mincov and cov <= self.maxcov:# see also above
       self.submit(pd)
     self.beginning.inc
     result.inc
