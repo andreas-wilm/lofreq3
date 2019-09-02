@@ -1,1 +1,0 @@
-nim c -o:bin/$1 -d:release $1.nim 
