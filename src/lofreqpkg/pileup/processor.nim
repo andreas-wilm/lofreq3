@@ -60,34 +60,52 @@ proc mergeQuals*(q_m: int, q_a: int, q_b: int): int =
   prob2qual(p_c)
 
 
-proc matchQual(r: Record, i: int, useMQ: bool): int =
+proc insQualityAt(r: Record, i: int):  Natural =
+  let bi = tag[cstring](r, "BI")
+  if bi.isSome:
+    return decodeASCIIQual(bi.get[i])
+  else:
+    return high(int)
+
+
+proc delQualityAt(r: Record, i: int): Natural =
+    let bd = tag[cstring](r, "BD")
+    if bd.isSome:
+      return decodeASCIIQual(bd.get[i])
+    else:
+      return high(int)
+
+
+proc matchQual(r: Record, i: int, useMQ: bool): Natural =
   var q_m = high(int)
   let q_a = high(int)# FIXME unsupported
   let q_b = int(r.baseQualityAt(i))
-  
+
   if useMQ:
     q_m = int(r.mapping_quality)
   mergeQuals(q_m, q_a, q_b)
 
 
-proc insQual(r: Record, i: int, useMQ: bool): int =
+proc insQual(r: Record, i: int, useMQ: bool): Natural =
   var q_m = high(int)
   let q_a = high(int)# FIXME unsupported
-  let q_b = DEFAULT_INSERTION_QUALITY# FIXME read from record
-  
+  #let q_b = DEFAULT_INSERTION_QUALITY# FIXME read from record
+  let q_i = r.insQualityAt(i)
+
   if useMQ:
     q_m = int(r.mapping_quality)
-  mergeQuals(q_m, q_a, q_b)
+  mergeQuals(q_m, q_a, q_i)
 
 
-proc delQual(r: Record, i: int, useMQ: bool): int =
+proc delQual(r: Record, i: int, useMQ: bool): Natural =
   var q_m = high(int)
   let q_a = high(int)# FIXME unsupported
-  let q_b = DEFAULT_DELETION_QUALITY# FIXME read from record
+  #let q_b = DEFAULT_DELETION_QUALITY# FIXME read from record
+  let q_d = r.delQualityAt(i)
 
   if useMQ:
     q_m = int(r.mapping_quality)
-  mergeQuals(q_m, q_a, q_b)
+  mergeQuals(q_m, q_a, q_d)
 
 
 proc newProcessor*[TStorage](storage: TStorage, useMQ: bool): 

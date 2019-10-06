@@ -8,6 +8,9 @@ import math
 import strutils
 import times
 
+proc decodeASCIIQual*(qual: char,  offset: Natural = 33): Natural =
+  return ord(qual)-offset
+
 
 ## brief convert error probability to phred quality
 proc prob2qual*(e: float): Natural =
