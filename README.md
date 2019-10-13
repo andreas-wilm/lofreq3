@@ -12,7 +12,6 @@ The old code had aquired a lot of technical depth, which eventually limited its 
 We chose [Nim](https://nim-lang.org/) for a reimplementation, because Nim has an intuitive and clean syntax. It looks similar to Python and compiles via C to small and fast binaries. And it's simply fun. Thanks to Brent Petersen the required [htslib library for
 Nim](https://github.com/brentp/hts-nim) exists. We hope that this reimplementation ensures that the LoFreq development continues.
 
-
 ## Citation
 
 If you use LoFreq, please cite the original publication:
@@ -104,7 +103,7 @@ raw base qualities and mapping qualities. Ideally you calibrate mapping qualitie
 This version of LoFreq doesn't implement any preprocessing steps. Please refer
 to LoFreq version 2.
 
-**FIXME** 
+**FIXME**
 
 ### Pileup
 
@@ -137,9 +136,7 @@ probability, but just means that the sequencing machine wasn't sure about an
 entire segment in the read. This obviously affects LoFreq, which treat these as
 bases/indels with high error probabilty.
 
-
 ### Variant Calling
-
 
 This steps takes the pileup json file as input, calls variants and outputs a
 VCF file. It is implemented in the `lofreq call` command. Default
@@ -151,7 +148,6 @@ Unless your samples were highly PCR amplified, we suggest to filter on strand bi
 
 - FIXME: bcftools command
 - FIXME: paper explaining strand bias it
-
 
 ### Postprocessing of variants
 
@@ -173,7 +169,6 @@ Run `nimble build` to build the binary (see `./lofreq`)
 
 Run `nimble test` to run tests (some of which depend on the successful build).
 
-
 To execute the compiled library, you will need the [htslib
 library](https://github.com/samtools/htslib) installed and in your
 LD_LIBRARY_PATH as well.
@@ -189,14 +184,11 @@ Installation of other dependencies is taking care of by Nimble.
 This version is know to work with:
 cligen@0.9.37, hts@0.2.19, tempfile@0.1.7
 
-
-
-# To Do List 
+# To Do List
 
 In order of importance:
 
-- Enable use of indel quals in processor.nim 
-- Enable merging of alignment qualities for bases, ins and dels in processor.nim 
+- testing: base qualities, ins qualities, del qualities
 - CI on Github
 - Wrapper: Multithreaded pileup and call as one, with region inference
 - Create release and announce availability
@@ -206,7 +198,7 @@ In order of importance:
   - test merged qualities against old lofreq
   - full test against spike in data
   - coverage and SB output in vcf
-- Add Snakemake workflow 
+- Add Snakemake workflow
 - Add workflow and container for end to end processing with old LoFreq. Consider adding BAQ and indel multiplexed before sorting
 - Performance
   - Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode
