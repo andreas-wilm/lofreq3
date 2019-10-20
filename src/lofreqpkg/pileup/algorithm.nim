@@ -23,7 +23,7 @@ import storage/slidingDeque
 
 var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
-        
+
 proc allowed(operation: CigarOp): bool {.inline.} =
   ## Determines whether a cigar operation is allowed or not.
   ## Returns true if allowed, false otherwise.
@@ -33,6 +33,7 @@ proc allowed(operation: CigarOp): bool {.inline.} =
 
 
 proc processEvent[TSequence, TProcessor](event: CigarElement,
+                  nextevent: CigarElement,
                   processor: var TProcessor,
                   read: Record, reference: TSequence,
                   readOffset: int, refOffset: int): (int, int) {.inline.} =
@@ -40,8 +41,8 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
   ## offset. The event is described by the first argument, 'event'.
   ## The parameter 'processor' provides a reference to the processor used to
   ## handle the events. 'read' and 'reference' are the read and the reference
-  ## sequences. 'readOffset' and 'refOffset' mark the current position on the 
-  ## read and the reference respectively. After processing the event, the 
+  ## sequences. 'readOffset' and 'refOffset' mark the current position on the
+  ## read and the reference respectively. After processing the event, the
   ## procedure returns the new offsets as a tuple.
   let operation = event.op
 
@@ -49,7 +50,7 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
     raise newException(ValueError, "Invalid operation: " & $operation)
 
   if operation == soft_clip:
-    # a soft clip is not processed but advaces the position on the read
+    # a soft clip is not processed but advances the position on the read
     return (readOffset + event.len, refOffset)
 
   let consumes = event.consumes()
@@ -57,22 +58,25 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
   if consumes.query and consumes.reference:
     # mutual, process all matches
     processor.processMatches(readOffset, refOffset, event.len,
-                    read, reference)
+                    read, reference, nextevent)
     return (readOffset + event.len, refOffset + event.len)
 
-  if consumes.reference:
+  elif consumes.reference:# also true for 'N'
     # reference only, process deletion
-    processor.processDeletion(readOffset, refOffset, event.len,
-                     read, reference)
+    if event.op == CigarOp.deletion:
+      processor.processDeletion(readOffset, refOffset, event.len,
+                       read, reference)
     return (readOffset, refOffset + event.len)
 
-  if consumes.query:
+  elif consumes.query:# also true for 'S'
     # read only, process insertion
-    processor.processInsertion(readOffset, refOffset, event.len,
-                      read, reference)
+    if event.op == CigarOp.insert:
+      processor.processInsertion(readOffset, refOffset, event.len,
+                        read, reference)
     return (readOffset + event.len, refOffset)
 
-  raise newException(ValueError, "Operation does not consume anything.")
+  else:
+    raise newException(ValueError, "Operation does not consume anything.")
 
 
 proc valid(cigar: Cigar): bool {.inline.} =
@@ -87,7 +91,7 @@ proc valid(cigar: Cigar): bool {.inline.} =
         result = false
 
 
-proc pileup*(fai: Fai, records: RecordFilter, region: Region, 
+proc pileup*(fai: Fai, records: RecordFilter, region: Region,
   useMQ: bool, handler: DataToVoid, mincov = 1, maxcov = high(int)): void {.inline.} =
   ## Performs a pileup over all reads provided by records
 
@@ -100,7 +104,7 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
       # load reference only after we're sure there's data to process
       if reference.len == 0:
         reference = fai.loadSequence(records.chromosomeName)
-       
+
       let cigar = read.cigar
 
       if not cigar.valid:
@@ -116,9 +120,19 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
       processor.beginRead(read.start)
 
       # process all events on the read
-      for event in cigar:
+      # unfortunately we need to know the next event to avoid
+      # storing indel quals twice, which makes this a bit ugly
+      for idx in 0..<len(cigar):
+        let event = cigar[idx]
+        var isLastEvent = false
+        var nextevent: CigarElement
+        if idx+1 < len(cigar):
+          nextevent = cigar[idx+1]
+        else:
+          isLastEvent = true
+        log(logger, lvlError, "event:" & $event & " nextevent:" & $nextevent & " isLastEvent:" & $isLastEvent)
         (readOffset, refOffset) =
-          processEvent(event, processor, read, reference,
+          processEvent(event, nextevent, processor, read, reference,
                        readOffset, refOffset)
 
   # inform the processor that the pileup is done

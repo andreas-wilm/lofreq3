@@ -13,12 +13,15 @@
 ## - License: The MIT License
 
 # standard library
-import strutils
-import math
+#import strutils
+import logging
+#import math
 # third party
 import hts
 # project specific
 import ../utils
+
+var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
 
 const DEFAULT_BLANK_QUALITY = -1
@@ -147,7 +150,8 @@ proc newProcessor*[TStorage](storage: TStorage, useMQ: bool):
 
 proc processMatches*[TSequence](self: Processor,
                    readStart: int, refStart: int, length: int,
-                   read: Record, reference: TSequence) : void {.inline.} =
+                   read: Record, reference: TSequence,
+                   nextevent: CigarElement) : void {.inline.} =
   ## Processes a matching substring between the read and the reference. All
   ## necessary information is available through the arguments. A matching
   ## substring consists of multiple contiguous matching bases.
@@ -158,6 +162,17 @@ proc processMatches*[TSequence](self: Processor,
                                self.matchQualityAt(read, readOff, self.useMQ),
                                read.flag.reverse,
                                reference.baseAt(refOff))
+    # FIXME Leads to wrong recording
+    # Try ./lofreq pileup -b ../data/spike-in-viterbi.down10p.bam  -f ../data/Ecoli_K12_MG1655_NC_000913.fa -r NC_000913:867-869 | ./parseplp.py
+    # here we also need to record the non-indel indel qualities.
+    # uninitialized nextevent (= last element) translates to 0M
+    if nextevent.op != CigarOp.insert and nextevent.op != CigarOp.deletion:
+      self.storage.recordInsertion(refOff, "*",
+        self.insertionQualityAt(read, readOff, self.useMQ),
+        read.flag.reverse)
+      self.storage.recordDeletion(refOff, "*",
+        self.deletionQualityAt(read, readOff, self.useMQ),
+        read.flag.reverse)
 
 
 proc processInsertion*[TSequence](self: Processor,

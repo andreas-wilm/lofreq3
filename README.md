@@ -188,6 +188,8 @@ cligen@0.9.37, hts@0.2.19, tempfile@0.1.7
 
 In order of importance:
 
+- pileup indel qualities for non indel pos
+- call indels
 - testing: base qualities, ins qualities, del qualities
 - CI on Github
 - Wrapper: Multithreaded pileup and call as one, with region inference

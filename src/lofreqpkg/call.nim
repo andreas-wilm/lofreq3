@@ -180,8 +180,8 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
   var baseCountsStranded = initCountTable[string]()# strand aware counts
   var eProbs: seq[float] = @[]# base error probabilites
 
-  # Fill array of error probabilities, set baseCounts and baseCountsStranded.
-  # Note that base's strand is indicated by its case.
+  # fill array of error probabilities, set baseCounts and baseCountsStranded.
+  # note that base's strand is indicated by its case.
   for base, qhist in plp.matches.pairs():
     var thisBaseCount = 0
     assert len(base) == 1# because SNP branch
@@ -197,19 +197,17 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
     baseCountsStranded.inc(base, thisBaseCount)
     baseCounts.inc(base.toUpperAscii, thisBaseCount)
 
-  #echo "DEBUG: eprobs=", $eprobs
-
   # determine coverage (not merged into above for readability).
   # this includes spanning insertions.
   var coverage = 0
-  for b, c in pairs baseCounts:
+  for b, c in pairs(baseCounts):
     coverage += c
   assert len(eProbs) + baseCounts.getOrDefault("*") == coverage
 
   # determine valid alt bases and max alt count (not merged into above for readability)
   var altBases: seq[string]
   var maxAltCount = 0
-  for b, c in pairs baseCounts:
+  for b, c in pairs(baseCounts):
     if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
       altBases.add(b)
       if c > maxAltCount:
@@ -224,7 +222,7 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
     var prevAltCount = high(int)# paranoid check to ensure sorting of pairs and early exit
     sort(baseCounts)
     for altBase, altCount in pairs baseCounts:
-      # weird: ooping over altBases and getting altCount directly doesn't seem to work after
+      # weird: looping over altBases and getting altCount directly doesn't seem to work after
       # (destructive) sort on baseCounts. only iterators supported?
       if not altBases.contains(altBase):
         continue
@@ -264,6 +262,7 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
   for line in plpFh.lines:
     var plp = parsePlpJson(line)
     let vcfVars = call(plp, minQual, minAF)
+    # FIXME indel calling missing. new or subfunc or call?
     if len(vcfVars) > 0:
       echo vcfVars.join("\n")
 
