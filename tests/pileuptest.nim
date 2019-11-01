@@ -23,6 +23,7 @@ suite "pileup tests":
 
     for kind, folderPath in walkDir("pileup_samples"):
       actual = newJArray()
+      echo "Testing " & folderPath
       let faiFile = joinPath(folderPath, "ref.fa")
       let bamFile = joinPath(folderPath, "alignments.bam")
       let expected = parseFile(joinPath(folderPath, "output.json"))
@@ -30,7 +31,7 @@ suite "pileup tests":
       # in the past we could call full_pileup with .then from pipelinetools
       # that stopped working with newer nim compilers, so we need to call
       # the binary. old: full_pileup(bamFile, faiFile, "ref:1-14", false)#.then(proc (x: JsonNode): void = actual.add(x)))
-           
+
       let cmd = lofreq & " pileup -b " & bamfile & " -f " & faifile & " -r ref:1-13 --noMQ"
       var outp = execProcess(cmd, options = {poUsePath, poEvalCommand})# disables default poStdErrToStdOut
       outp = "[" & outp.replace("\n", ",") & "]"

@@ -62,7 +62,6 @@ proc mergeQuals*(q_m: int, q_a: int, q_b: int): int =
   let p_m = qual2prob(q_m)# mapping error
   let p_a = qual2prob(q_a)# alignment error
   let p_b = qual2prob(q_b)# base error
-
   let p_c = p_m + (1-p_m)*p_a + (1-p_m)*(1-p_a)*p_b
   prob2qual(p_c)
 
@@ -111,11 +110,9 @@ proc matchQual(r: Record, i: int, useMQ: bool): Natural =
   var q_m = high(int)
   let q_a = r.baseAlnQualityAt(i)
   let q_b = int(r.baseQualityAt(i))
-
   if useMQ:
     q_m = int(r.mapping_quality)
   mergeQuals(q_m, q_a, q_b)
-
 
 proc insQual(r: Record, i: int, useMQ: bool): Natural =
   var q_m = high(int)
@@ -164,14 +161,22 @@ proc processMatches*[TSequence](self: Processor,
                                reference.baseAt(refOff))
     # FIXME Leads to wrong recording
     # Try ./lofreq pileup -b ../data/spike-in-viterbi.down10p.bam  -f ../data/Ecoli_K12_MG1655_NC_000913.fa -r NC_000913:867-869 | ./parseplp.py
-    # here we also need to record the non-indel indel qualities.
-    # uninitialized nextevent (= last element) translates to 0M
-    if nextevent.op != CigarOp.insert and nextevent.op != CigarOp.deletion:
-      self.storage.recordInsertion(refOff, "*",
-        self.insertionQualityAt(read, readOff, self.useMQ),
-        read.flag.reverse)
+    # Here we also need to record the indel qualities emitted from matches.
+    # Just be careful to not count twice (hence check next op if at the end)
+    if offset < length-1:
+        self.storage.recordInsertion(refOff, "*",
+          self.insertionQualityAt(read, readOff, self.useMQ),
+          read.flag.reverse)
+        self.storage.recordDeletion(refOff, "*",
+          self.deletionQualityAt(read, readOff, self.useMQ),
+          read.flag.reverse)
+    elif nextevent.op == CigarOp.insert:
       self.storage.recordDeletion(refOff, "*",
         self.deletionQualityAt(read, readOff, self.useMQ),
+        read.flag.reverse)
+    elif nextevent.op == CigarOp.deletion:
+      self.storage.recordInsertion(refOff, "*",
+        self.insertionQualityAt(read, readOff, self.useMQ),
         read.flag.reverse)
 
 

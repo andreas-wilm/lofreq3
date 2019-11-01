@@ -18,7 +18,7 @@ proc prob2qual*(e: float): Natural =
   assert e>=0.0
   if e.classify == fcZero:
     return high(Natural)
-  return Natural(-10.0 * log10(e))
+  return Natural(round(-10.0 * log10(e)))
 
 
 ## brief convert phred quality to error probability

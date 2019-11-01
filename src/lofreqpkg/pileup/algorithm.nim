@@ -124,15 +124,11 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
       # storing indel quals twice, which makes this a bit ugly
       for idx in 0..<len(cigar):
         let event = cigar[idx]
-        var isLastEvent = false
         var nextevent: CigarElement
+        # uninitialized nextevent (= last element) translates to 0M
         if idx+1 < len(cigar):
           nextevent = cigar[idx+1]
-        else:
-          isLastEvent = true
-        log(logger, lvlError, "event:" & $event & " nextevent:" & $nextevent & " isLastEvent:" & $isLastEvent)
-        (readOffset, refOffset) =
-          processEvent(event, nextevent, processor, read, reference,
+        (readOffset, refOffset) = processEvent(event, nextevent, processor, read, reference,
                        readOffset, refOffset)
 
   # inform the processor that the pileup is done
