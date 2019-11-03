@@ -4,7 +4,7 @@ import math
 import osproc
 import strutils
 import tempfile
-# project specific 
+# project specific
 import ../src/lofreqpkg/call
 import ../src/lofreqpkg/utils
 # third party
@@ -46,7 +46,7 @@ suite "pileup and call":
         check rec.info.get("DP4", dp4) == Status.OK
         # don't know how to check DP4
         #check dp4 == @[0'i32, 1'i32, 1'i32, 0'i32]
-        check rec.QUAL == 19
+        check rec.QUAL == 20
 
     check nvars == 10
 
@@ -97,5 +97,3 @@ suite "pvalue computation":
     pvalue = exp(probvec[num_failures]);
     #echo("DEBUG num_failures=" & $num_failures & " pvalue=" & $pvalue  & " prob2qual=" & $prob2qual(pvalue))
     check abs(pvalue - 0.02240387) < 1e-6
-    
-    
