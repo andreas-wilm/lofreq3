@@ -17,21 +17,21 @@ type InfoField* = object
   sb*: int
   dp*: int
   dp4*: Dp4
+  vtype*: string
 
 type Variant* = ref object
   chrom*: string
   pos*: int
   id*: string
-  refBase*: char
+  refBase*: string
   alt*: string
   qual*: int
   filter*: string
   info*: InfoField
 
-
 proc `$`*(v: Variant): string =
   let dp4 = fmt"{v.info.dp4.refForward},{v.info.dp4.refReverse},{v.info.dp4.altForward},{v.info.dp4.altReverse}"
-  var info = fmt"AF={v.info.af:.6f};SB={v.info.sb};DP={v.info.dp};DP4={dp4}"
+  var info = fmt"AF={v.info.af:.6f};SB={v.info.sb};DP={v.info.dp};DP4={dp4};TYPE={v.info.vtype}"
   fmt("{v.chrom}\t{v.pos}\t{v.id}\t{v.refBase}\t{v.alt}\t{v.qual}\t{v.filter}\t{info}")# fmt() to get tabs
 
 
@@ -52,4 +52,5 @@ proc vcfHeader*(src: string = "", refFa: string = ""): string =
 ##INFO=<ID=DP4,Number=4,Type=Integer,Description="Counts for ref-forward bases, ref-reverse, alt-forward and alt-reverse bases">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO"""
 
+# FIXME add TPE as INFO field
 

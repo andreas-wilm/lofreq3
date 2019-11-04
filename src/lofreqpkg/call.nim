@@ -9,6 +9,7 @@ import json
 import utils
 import math
 import strutils
+import logging
 # third party
 from hts/stats import fishers_exact_test
 # project specific
@@ -26,6 +27,10 @@ type PositionData = object
     matches: QualHist
     deletions: QualHist
     insertions: QualHist
+
+type VarType = enum snp, ins, del
+
+var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
 
 ## brief Computes log(exp(logA) + exp(logB))
@@ -160,7 +165,7 @@ proc parsePlpJson(jsonString: string): PositionData =
 
 
 proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
-  baseCountsStranded: CountTable[string]): InfoField =
+  baseCountsStranded: CountTable[string], vtype: string): InfoField =
   result.af = af
   result.dp = coverage
   var dp4: Dp4
@@ -172,83 +177,115 @@ proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
   var f = fishers_exact_test(dp4.refForward, dp4.refReverse,
     dp4.altForward, dp4.altReverse)
   result.sb = prob2qual(f.two)
+  result.vtype = vtype
+
+
+proc getCountsAndEProbs[T](opData: T, vartype: VarType): (seq[float], Natural, CountTable[string], CountTable[string]) =
+  # fill array of error probabilities, set baseCounts and baseCountsStranded.
+  # note that base's strand is indicated by its case.
+  var eProbs: seq[float] = @[]# base error probabilites
+  var baseCounts = initCountTable[string]()# base counts
+  var baseCountsStranded = initCountTable[string]()# strand aware counts
+  var coverage: Natural = 0
+
+  for base, qhist in pairs(opData):
+    var thisBaseCount = 0
+    if vartype == snp:
+      assert len(base) == 1
+    for qual, count in qhist:
+      assert count>=0
+      thisBaseCount += count
+      # snp: '*' are deletions, i.e. physical coverage (count) with q=-1 (ignore)
+      if vartype == snp and base == "*":
+        continue
+      assert qual>=0# "*" have q=-1
+      let e = qual2prob(qual)
+      for i in countup(1, count):
+        eProbs.add(e)
+    baseCountsStranded.inc(base, thisBaseCount)
+    baseCounts.inc(base.toUpperAscii, thisBaseCount)
+    coverage += thisBaseCount
+
+  return (eProbs, coverage, baseCounts, baseCountsStranded)
 
 
 ## result is a sequence, because we might return multiple variants for this position
 proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Variant] =#{.gcsafe.} =
-  var baseCounts = initCountTable[string]()# base counts
-  var baseCountsStranded = initCountTable[string]()# strand aware counts
-  var eProbs: seq[float] = @[]# base error probabilites
+  var eprobs: seq[float]
+  var coverage: Natural
+  var baseCounts: CountTable[string]
+  var baseCountsStranded: CountTable[string]
 
-  # fill array of error probabilities, set baseCounts and baseCountsStranded.
-  # note that base's strand is indicated by its case.
-  for base, qhist in plp.matches.pairs():
-    var thisBaseCount = 0
-    assert len(base) == 1# because SNP branch
-    for qual, count in qhist:
-      assert count>=0
-      thisBaseCount += count
-      # '*' are deletions, i.e. physical coverage (count) with q=-1 (ignore)
-      if base != "*":
-        assert qual>=0# "*" have q=-1
-        let e = qual2prob(qual)
-        for i in countup(1, count):
-          eProbs.add(e)
-    baseCountsStranded.inc(base, thisBaseCount)
-    baseCounts.inc(base.toUpperAscii, thisBaseCount)
+  for vartype in low(VarType)..high(VarType):
+    # FIXME there got ot be an easier way to do this
+    if vartype == snp:
+      (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.matches, snp)
+    elif vartype == ins:
+      (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.insertions, ins)
+    elif vartype == del:
+      (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.deletions, del)
+    else:
+      raise newException(ValueError, "Illegal vartype" & $vartype)
 
-  # determine coverage (not merged into above for readability).
-  # this includes spanning insertions.
-  var coverage = 0
-  for b, c in pairs(baseCounts):
-    coverage += c
-  assert len(eProbs) + baseCounts.getOrDefault("*") == coverage
-
-  # determine valid alt bases and max alt count (not merged into above for readability)
-  var altBases: seq[string]
-  var maxAltCount = 0
-  for b, c in pairs(baseCounts):
-    if b[0] != plp.refBase and b[0] != 'N' and b[0] != '*':
+    # determine valid alt bases and max alt count (not merged into above for readability)
+    var altBases: seq[string]
+    var maxAltCount = 0
+    for b, c in pairs(baseCounts):
+      if vartype == snp and (b[0] == plp.refBase or b[0] == 'N'):
+        continue
+      if b[0] == '*':
+        continue
       altBases.add(b)
       if c > maxAltCount:
         maxAltCount = c
-  #debug "baseCounts at " & $plp.refIndex & " = " & $baseCounts
-  #debug "maxAltCount at " & $plp.refIndex & " = " & $maxAltCount
 
-  # loop over altBases and determine whether they are variants
-  let maxAF = maxAltCount/coverage
-  if maxAF >= minAF and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
-    let probVec = prunedProbDist(eProbs, maxAltCount)# FIXME call "by reference" to safe memory?
-    var prevAltCount = high(int)# paranoid check to ensure sorting of pairs and early exit
-    sort(baseCounts)
-    for altBase, altCount in pairs baseCounts:
-      # weird: looping over altBases and getting altCount directly doesn't seem to work after
-      # (destructive) sort on baseCounts. only iterators supported?
-      if not altBases.contains(altBase):
-        continue
-      assert altCount <= prevAltCount
-      prevAltCount = altCount
+    # loop over altBases and determine whether they are variants
+    let maxAF = maxAltCount/coverage
+    if maxAF >= minAF and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
+      let probVec = prunedProbDist(eProbs, maxAltCount)# FIXME call "by reference" to safe memory?
+      var prevAltCount = high(int)# paranoid check to ensure sorting of pairs and early exit
+      sort(baseCounts)
+      for altBase, altCount in pairs(baseCounts):
+        # weird: looping over altBases and getting altCount directly doesn't seem to work after
+        # (destructive) sort on baseCounts. only iterators supported?
+        if not altBases.contains(altBase):
+          continue
+        assert altCount <= prevAltCount
+        prevAltCount = altCount
 
-      # need to check minAF again, because test above was for most frequent base only
-      let af = altCount/coverage
-      if af < minAF or altCount == 0:
-        #echo "DEBUG af<minAF for " & altBase & ":" & $altCount & " = " & $af & "<" & $minAF
-        break# early exit possible since baseCounts are sorted
+        # need to check minAF again, because test above was for most frequent base only
+        let af = altCount/coverage
+        if af < minAF or altCount == 0:
+          #echo "DEBUG af<minAF for " & altBase & ":" & $altCount & " = " & $af & "<" & $minAF
+          break# early exit possible since baseCounts are sorted
 
-      # for maxAltCount exp(probVec[altCount]) == exp(probvecTailSum(probVec, altCount))
-      let pvalue = exp(probvecTailSum(probVec, altCount))
-      let qual = prob2qual(pvalue)
-      if qual < minQual:
-        #echo "DEBUG qual<minQual for " & altBase & ":" & $altCount & " = " & $qual & "<" & $minQual
-        break# early exit possible since baseCounts are sorted
+        # for maxAltCount exp(probVec[altCount]) == exp(probvecTailSum(probVec, altCount))
+        let pvalue = exp(probvecTailSum(probVec, altCount))
+        let qual = prob2qual(pvalue)
+        if qual < minQual:
+          #echo "DEBUG qual<minQual for " & altBase & ":" & $altCount & " = " & $qual & "<" & $minQual
+          break# early exit possible since baseCounts are sorted
 
-      #echo "DEBUG: creating var"
-      var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
-        id : ".", refBase : plp.refBase, alt : altBase, qual : qual, filter : ".")
-      vcfVar.info = setVarInfo(af, coverage, plp.refBase, altBase, baseCountsStranded)
-      result.add(vcfVar)
-  #else:
-    #echo "DEBUG maxAF<minAF: " & $maxAF & "<" & $minAF
+        var varRefBase, varAltBase: string
+        if vartype == snp:
+          varRefBase = $plp.refBase
+          varAltBase = altBase
+        elif vartype == ins:
+          varRefBase = $plp.refBase
+          varAltBase = $plp.refBase & altBase
+        elif vartype == del:
+          # FIXME broken for deletions >1
+          varRefBase = $plp.refBase & altBase
+          varAltBase = altBase
+        else:
+          raise newException(ValueError, "Illegal vartype" & $vartype)
+
+        var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
+          id : ".", refBase : varRefBase, alt : varAltBase, qual : qual, filter : ".")
+        if vartype == ins or vartype == del:
+          logger.log(lvlWarn, "DP4 not working with indels")# FIXME
+        vcfVar.info = setVarInfo(af, coverage, plp.refBase, altBase, baseCountsStranded, $vartype)
+        result.add(vcfVar)
 
 
 proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
