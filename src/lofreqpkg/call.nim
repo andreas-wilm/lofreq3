@@ -6,7 +6,6 @@
 # standard
 import tables
 import json
-import utils
 import math
 import strutils
 import logging
@@ -14,6 +13,7 @@ import logging
 from hts/stats import fishers_exact_test
 # project specific
 import vcf
+import utils
 
 
 type QualHist = Table[string, CountTable[int]]
@@ -165,7 +165,7 @@ proc parsePlpJson(jsonString: string): PositionData =
 
 
 proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
-  baseCountsStranded: CountTable[string], vtype: string): InfoField =
+  baseCountsStranded: CountTable[string], vtype: VarType): InfoField =
   result.af = af
   result.dp = coverage
   var dp4: Dp4
@@ -173,11 +173,16 @@ proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
   dp4.refReverse = baseCountsStranded.getOrDefault($refBase.toLowerAscii)
   dp4.altForward = baseCountsStranded.getOrDefault(altBase.toUpperAscii)
   dp4.altReverse = baseCountsStranded.getOrDefault(altBase.toLowerAscii)
+  if vtype == ins or vtype == del:# indel
+    assert dp4.refForward == 0
+    assert dp4.refReverse == 0
+    dp4.refForward = baseCountsStranded.getOrDefault($REF_SYMBOL_AT_INDEL_FW)
+    dp4.refReverse = baseCountsStranded.getOrDefault($REF_SYMBOL_AT_INDEL_RV)
   result.dp4 = dp4
   var f = fishers_exact_test(dp4.refForward, dp4.refReverse,
     dp4.altForward, dp4.altReverse)
   result.sb = prob2qual(f.two)
-  result.vtype = vtype
+  result.vtype = $vtype
 
 
 proc getCountsAndEProbs[T](opData: T, vartype: VarType): (seq[float], Natural, CountTable[string], CountTable[string]) =
@@ -196,9 +201,9 @@ proc getCountsAndEProbs[T](opData: T, vartype: VarType): (seq[float], Natural, C
       assert count>=0
       thisBaseCount += count
       # snp: '*' are deletions, i.e. physical coverage (count) with q=-1 (ignore)
-      if vartype == snp and base == "*":
+      if vartype == snp and base == $DEFAULT_BLANK_SYMBOL:
         continue
-      assert qual>=0# "*" have q=-1
+      assert qual>=0# DEFAULT_BLANK_SYMBOL have q=-1
       let e = qual2prob(qual)
       for i in countup(1, count):
         eProbs.add(e)
@@ -233,7 +238,7 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
     for b, c in pairs(baseCounts):
       if vartype == snp and (b[0] == plp.refBase or b[0] == 'N'):
         continue
-      if b[0] == '*':
+      if b[0] in @[DEFAULT_BLANK_SYMBOL, REF_SYMBOL_AT_INDEL_FW, REF_SYMBOL_AT_INDEL_RV]:
         continue
       altBases.add(b)
       if c > maxAltCount:
@@ -274,7 +279,6 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
           varRefBase = $plp.refBase
           varAltBase = $plp.refBase & altBase
         elif vartype == del:
-          # FIXME broken for deletions >1
           varRefBase = $plp.refBase & altBase
           varAltBase = $plp.refBase
         else:
@@ -282,7 +286,7 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
 
         var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
           id : ".", refBase : varRefBase, alt : varAltBase, qual : qual, filter : ".")
-        vcfVar.info = setVarInfo(af, coverage, plp.refBase, altBase, baseCountsStranded, $vartype)
+        vcfVar.info = setVarInfo(af, coverage, plp.refBase, altBase, baseCountsStranded, vartype)
         result.add(vcfVar)
 
 
@@ -297,7 +301,6 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
   for line in plpFh.lines:
     var plp = parsePlpJson(line)
     let vcfVars = call(plp, minQual, minAF)
-    # FIXME indel calling missing. new or subfunc or call?
     if len(vcfVars) > 0:
       echo vcfVars.join("\n")
 

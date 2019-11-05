@@ -25,7 +25,6 @@ var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
 
 const DEFAULT_BLANK_QUALITY = -1
-const DEFAULT_BLANK_SYMBOL = '*' # missing position symbol
 
 const INS_ALN_QUAL_TAG = "ai"# ins alignment quality tag. defined by LoFreq v2
 const DEL_ALN_QUAL_TAG = "ad"# del alignment quality tag. Defined by LoFreq v2
@@ -114,11 +113,11 @@ proc matchQual(r: Record, i: int, useMQ: bool): Natural =
     q_m = int(r.mapping_quality)
   mergeQuals(q_m, q_a, q_b)
 
+
 proc insQual(r: Record, i: int, useMQ: bool): Natural =
   var q_m = high(int)
   let q_a = r.insAlnQualityAt(i)
   let q_i = r.insQualityAt(i)
-
   if useMQ:
     q_m = int(r.mapping_quality)
   mergeQuals(q_m, q_a, q_i)
@@ -128,7 +127,6 @@ proc delQual(r: Record, i: int, useMQ: bool): Natural =
   var q_m = high(int)
   let q_a = r.delAlnQualityAt(i)
   let q_d = r.delQualityAt(i)
-
   if useMQ:
     q_m = int(r.mapping_quality)
   mergeQuals(q_m, q_a, q_d)
@@ -159,23 +157,21 @@ proc processMatches*[TSequence](self: Processor,
                                self.matchQualityAt(read, readOff, self.useMQ),
                                read.flag.reverse,
                                reference.baseAt(refOff))
-    # FIXME Leads to wrong recording
-    # Try ./lofreq pileup -b ../data/spike-in-viterbi.down10p.bam  -f ../data/Ecoli_K12_MG1655_NC_000913.fa -r NC_000913:867-869 | ./parseplp.py
     # Here we also need to record the indel qualities emitted from matches.
     # Just be careful to not count twice (hence check next op if at the end)
     if offset < length-1:
-        self.storage.recordInsertion(refOff, "*",
+        self.storage.recordInsertion(refOff, $refSymbolAtIndel(read.flag.reverse),
           self.insertionQualityAt(read, readOff, self.useMQ),
           read.flag.reverse)
-        self.storage.recordDeletion(refOff, "*",
+        self.storage.recordDeletion(refOff, $refSymbolAtIndel(read.flag.reverse),
           self.deletionQualityAt(read, readOff, self.useMQ),
           read.flag.reverse)
     elif nextevent.op == CigarOp.insert:
-      self.storage.recordDeletion(refOff, "*",
+      self.storage.recordDeletion(refOff, $refSymbolAtIndel(read.flag.reverse),
         self.deletionQualityAt(read, readOff, self.useMQ),
         read.flag.reverse)
     elif nextevent.op == CigarOp.deletion:
-      self.storage.recordInsertion(refOff, "*",
+      self.storage.recordInsertion(refOff, $refSymbolAtIndel(read.flag.reverse),
         self.insertionQualityAt(read, readOff, self.useMQ),
         read.flag.reverse)
 
