@@ -20,8 +20,10 @@ type OperationData*[T] = object
   ## values and their qualities
   histogram: QualityHistogram[T]
 
+
 proc coverage*(self: OperationData): Natural =
     coverage(self.histogram)
+
 
 proc initOperationData*[T](): OperationData[T] {.inline.} =
   ## Creates a new 'OperationData' object. All that it needs is the type for

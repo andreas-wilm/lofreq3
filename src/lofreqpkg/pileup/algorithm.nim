@@ -128,8 +128,8 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
         # uninitialized nextevent (= last element) translates to 0M
         if idx+1 < len(cigar):
           nextevent = cigar[idx+1]
-        (readOffset, refOffset) = processEvent(event, nextevent, processor, read, reference,
-                       readOffset, refOffset)
+        (readOffset, refOffset) = processEvent(
+          event, nextevent, processor, read, reference, readOffset, refOffset)
 
   # inform the processor that the pileup is done
   processor.done()

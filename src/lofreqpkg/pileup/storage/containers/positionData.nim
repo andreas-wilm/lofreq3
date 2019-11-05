@@ -69,7 +69,7 @@ proc addMatch*(self: var PositionData, base: char, quality: int,
 proc addInsertion*(self: var PositionData, bases: string, quality: int,
                    reverse: bool) {.inline.} =
   ## Accounts for an insertion on the position represented by this object.
-  ## In the most common biological use case, an insertion consists of one or 
+  ## In the most common biological use case, an insertion consists of one or
   ## more bases not present on the reference. It is defined by its value (one
   ## or more bases), its quality and its strand. The procedure only ensures the
   ## value is accounted for and does not check the data's validity.

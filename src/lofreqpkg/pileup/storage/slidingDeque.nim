@@ -56,10 +56,10 @@ proc posWithinRegion(pos: PositionData, reg: Region): bool =
 
 proc newSlidingDeque*(chromosome: string, region: Region, submit: DataToVoid,
   mincov: Natural = 0, maxcov: Natural = high(int), initialSize: int = DEFAULT_INITIAL_SIZE): SlidingDeque {.inline.} =
-  ## Constructs a new 'SlidingDeque' object. 
-  ## The paramater 'submit' is a procedure expected to perform all furhter 
+  ## Constructs a new 'SlidingDeque' object.
+  ## The paramater 'submit' is a procedure expected to perform all furhter
   ## processing. This procedure must be a consumer (not returning anything) of
-  ## type 'DataToVoid'. If the user passes a mapping procedure of type 
+  ## type 'DataToVoid'. If the user passes a mapping procedure of type
   ## 'DataToType', it matches against the second constructor which performs the
   ## required wrapping.
   ## There is an optional initial size argument for the queue for optimization
@@ -81,8 +81,8 @@ proc newSlidingDeque*(chromosome: string, region: Region, submit: DataToVoid,
 # proc newSlidingDeque*(chromosome: string, submit: DataToType,
 #                       initialSize: int = DEFAULT_INITIAL_SIZE
 #                      ): SlidingDeque {.inline.} =
-#   ## Constructs a new 'SlidingDeque' object. 
-#   ## The paramater 'submit' is a procedure expected to perform all furhter 
+#   ## Constructs a new 'SlidingDeque' object.
+#   ## The paramater 'submit' is a procedure expected to perform all furhter
 #   ## processing.
 #   ## This constructor accepts a procedure mapping a 'PositionData' object to
 #   ## any desired type and wraps it into a 'DataToVoid' consumer. There is an
@@ -183,10 +183,10 @@ proc flushUpTo*(self: SlidingDeque, position: int): int {.inline.} =
   ## The method returns the number of submitted elements.
   if position < self.beginning - 1:
     raise newException(ValueError, "Flush index lower than beginning.")
-  
+
   # if a new start position is larger than all positions contained in
   # the deque, instead of emptying it manually, we can submit it and
-  # make a new one  
+  # make a new one
   if position >= self.beginning + self.deq.len:
     # FIXME: simplify once the
     # tests are stable, this is an overkill

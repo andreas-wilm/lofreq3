@@ -188,25 +188,25 @@ cligen@0.9.37, hts@0.2.19, tempfile@0.1.7
 
 In order of importance:
 
-- pileup indel qualities for non indel pos
-- call indels
-- testing: base qualities, ins qualities, del qualities
-- CI on Github
-- Wrapper: Multithreaded pileup and call as one, with region inference
-- Create release and announce availability
-- Tests
-  - If nimble test is too limiting: https://github.com/ryanlayer/ssshtest
-  - add tests for invalid cigar ops: `^[ID]` and `^[S][ID]`
-  - test merged qualities against old lofreq
-  - full test against spike in data
-  - coverage and SB output in vcf
-- Add Snakemake workflow
+- Testing, testing, testing
+  - Test merged qualities against old lofreq
+  - Full test against spike in data
+  - Against samtools pileup
+  - mincov and maxcov filter (coverage() function) in the presence of indels
+  - Coverage in vcf
+  - SB output in vcf
+  - CI on Github
+  - Note: If nimble test is too limiting: https://github.com/ryanlayer/ssshtest
+- Implement filter or bcftools recipes (and add docs)
+- Wrapper: Multithreaded pileup and call as one, with region inference (and add docs)
 - Add workflow and container for end to end processing with old LoFreq. Consider adding BAQ and indel multiplexed before sorting
-- Performance
-  - Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode
+- Create release with static binary and announce availability
+- Contain viterbi, indelqul and alnqual somehow as libs and link
 - Extend documentation:
   - Note on invalid CIGAR ops
   - Explain how it works in detail
   - Why we force region and how to generate it
   - FAQ
   - Split usage from explanation and add section for the impatient
+- Performance
+  - Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode

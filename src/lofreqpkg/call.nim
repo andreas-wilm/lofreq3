@@ -276,14 +276,12 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
         elif vartype == del:
           # FIXME broken for deletions >1
           varRefBase = $plp.refBase & altBase
-          varAltBase = altBase
+          varAltBase = $plp.refBase
         else:
           raise newException(ValueError, "Illegal vartype" & $vartype)
 
         var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
           id : ".", refBase : varRefBase, alt : varAltBase, qual : qual, filter : ".")
-        if vartype == ins or vartype == del:
-          logger.log(lvlWarn, "DP4 not working with indels")# FIXME
         vcfVar.info = setVarInfo(af, coverage, plp.refBase, altBase, baseCountsStranded, $vartype)
         result.add(vcfVar)
 
