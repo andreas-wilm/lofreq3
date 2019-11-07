@@ -25,7 +25,7 @@ import ../region
 var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
 
-proc auto_fill_region*(reg: Region, targets: seq[Target]): Region = 
+proc auto_fill_region*(reg: Region, targets: seq[Target]): Region =
   result = reg
   var foundTarget = false
   for t in targets:
@@ -39,7 +39,7 @@ proc auto_fill_region*(reg: Region, targets: seq[Target]): Region =
 
 
 proc full_pileup*(bamFname: string, faFname = "", regions = "",
-  useMQ: bool, handler: DataToVoid, mincov: Natural, maxcov: Natural) : void =
+  useMQ: bool, handler: DataToVoid, mincov: Natural, maxcov: Natural, minBQ: int) : void =
   ## Performs the pileup over all chromosomes listed in the bam file.
   var bam: Bam
   var fai: Fai
@@ -65,13 +65,33 @@ proc full_pileup*(bamFname: string, faFname = "", regions = "",
     var records = newRecordFilter(bam, reg.sq, reg.s, reg.e)
 
     let time = cpuTime()
-    algorithm.pileup(fai, records, reg, useMQ, handler, mincov, maxcov)
-    info("Time taken to pileup reference ", reg.sq, " ", cpuTime() - time)
+    algorithm.pileup(fai, records, reg, useMQ, handler, mincov, maxcov, minBQ)
+    logger.log(lvlInfo, "Time taken to pileup reference ", reg.sq, " ", cpuTime() - time)
 
 
-proc pileup*(bamFname: string, regions: string, noMQ: bool = false, faFname = "", mincov = 1, maxcov = high(int)) =
+proc pileup*(bamFname: string, regions: string, noMQ: bool = false, faFname = "",
+             mincov = 1, maxcov = high(int), pretty = false, minBQ = 3, loglevel = 0) =
+
+  if logLevel >= 3:
+    setLogFilter(lvlDebug)
+  elif logLevel == 2:
+    setLogFilter(lvlInfo)
+  elif logLevel == 1:
+    setLogFilter(lvlNotice)
+  elif logLevel == 0:
+    setLogFilter(lvlWarn)
+  else:
+    quit("Invalid log level")
+
   #full_pileup(bamFname, faFname, doNothing)
-  full_pileup(bamFname, faFname, regions, not noMQ, toJsonAndPrint, mincov, maxcov)
+  var p: DataToVoid
+  if pretty:
+    p = toJsonAndPrettyPrint
+    logger.log(lvlWarn, "Pretty printing is good for debugging, but cannot be used for calling")
+
+  else:
+    p = toJsonAndPrint
+  full_pileup(bamFname, faFname, regions, not noMQ, p, mincov, maxcov, minBQ)
 
 
 when isMainModule:

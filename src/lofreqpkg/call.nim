@@ -9,6 +9,7 @@ import json
 import math
 import strutils
 import logging
+import strformat
 # third party
 from hts/stats import fishers_exact_test
 # project specific
@@ -140,11 +141,15 @@ proc parseOperationData(node: JsonNode): QualHist =
     discard result.hasKeyOrPut(event, initCountTable[int]())
     for qual, count in qHist.pairs():
       let q = parseInt($qual)
+      if q<0:# ignore everything filtered
+        continue
       let c = count.getInt
 
       assert result[event].hasKey(q) == false
       result[event][q] = c
-
+    # delete zombie entries (those with only filtered events)
+    if len(result[event]) == 0:
+      result.del(event)
 
 ## brief parse pileup object from json
 proc parsePlpJson(jsonString: string): PositionData =
@@ -174,8 +179,6 @@ proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
   dp4.altForward = baseCountsStranded.getOrDefault(altBase.toUpperAscii)
   dp4.altReverse = baseCountsStranded.getOrDefault(altBase.toLowerAscii)
   if vtype == ins or vtype == del:# indel
-    assert dp4.refForward == 0
-    assert dp4.refReverse == 0
     dp4.refForward = baseCountsStranded.getOrDefault($REF_SYMBOL_AT_INDEL_FW)
     dp4.refReverse = baseCountsStranded.getOrDefault($REF_SYMBOL_AT_INDEL_RV)
   result.dp4 = dp4
@@ -203,7 +206,7 @@ proc getCountsAndEProbs[T](opData: T, vartype: VarType): (seq[float], Natural, C
       # snp: '*' are deletions, i.e. physical coverage (count) with q=-1 (ignore)
       if vartype == snp and base == $DEFAULT_BLANK_SYMBOL:
         continue
-      assert qual>=0# DEFAULT_BLANK_SYMBOL have q=-1
+      assert qual>=0
       let e = qual2prob(qual)
       for i in countup(1, count):
         eProbs.add(e)
@@ -244,9 +247,12 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
       if c > maxAltCount:
         maxAltCount = c
 
+
     # loop over altBases and determine whether they are variants
     let maxAF = maxAltCount/coverage
     if maxAF >= minAF and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
+      logger.log(lvlDebug, fmt"Testing {vartype} at {plp.chromosome}:{plp.refIndex}: {baseCounts}")
+      #logger.log(lvlDebug, fmt"eprobs  {eprobs}")
       let probVec = prunedProbDist(eProbs, maxAltCount)# FIXME call "by reference" to safe memory?
       var prevAltCount = high(int)# paranoid check to ensure sorting of pairs and early exit
       sort(baseCounts)
@@ -267,6 +273,7 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
         # for maxAltCount exp(probVec[altCount]) == exp(probvecTailSum(probVec, altCount))
         let pvalue = exp(probvecTailSum(probVec, altCount))
         let qual = prob2qual(pvalue)
+        logger.log(lvlDebug, fmt"af={af:.6f} altCount={altCount} for {vartype} {altBase} gives qual={qual}")
         if qual < minQual:
           #echo "DEBUG qual<minQual for " & altBase & ":" & $altCount & " = " & $qual & "<" & $minQual
           break# early exit possible since baseCounts are sorted
@@ -290,7 +297,19 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
         result.add(vcfVar)
 
 
-proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
+proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005, logLevel = 0) =
+
+  if logLevel >= 3:
+    setLogFilter(lvlDebug)
+  elif logLevel == 2:
+    setLogFilter(lvlInfo)
+  elif logLevel == 1:
+    setLogFilter(lvlNotice)
+  elif logLevel == 0:
+    setLogFilter(lvlWarn)
+  else:
+    quit("Invalid log level")
+
   echo vcfHeader()
 
   var plpFh: File = if plpFname == "-": stdin else: open(plpFname)
@@ -303,6 +322,7 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005) =
     let vcfVars = call(plp, minQual, minAF)
     if len(vcfVars) > 0:
       echo vcfVars.join("\n")
+  logger.log(lvlDebug, "Done. Goodbye")
 
 
 when isMainModule:

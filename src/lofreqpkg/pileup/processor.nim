@@ -33,6 +33,10 @@ const BASE_ALN_QUAL_TAG = "BQ"# base alignment quality tag (BAQ)
 const INS_QUAL_TAG = "BI"# ins quality tag
 const DEL_QUAL_TAG = "BD"# del quality tag
 
+# minimum base quality. everything below will be recorded as -1.
+# this is later ignored/filtered by call(). 3 is default,
+# so that Illumina's Read Segment Quality Control Indicator" (#) gets ignored
+var minBQ* = 3
 
 ## The expected type of procedures for calculating the qualities. All relevant
 ## information should be obtainable through the record and the index.
@@ -146,17 +150,24 @@ proc newProcessor*[TStorage](storage: TStorage, useMQ: bool):
 proc processMatches*[TSequence](self: Processor,
                    readStart: int, refStart: int, length: int,
                    read: Record, reference: TSequence,
-                   nextevent: CigarElement) : void {.inline.} =
+                   nextevent: CigarElement, minBQ: int) : void {.inline.} =
   ## Processes a matching substring between the read and the reference. All
   ## necessary information is available through the arguments. A matching
   ## substring consists of multiple contiguous matching bases.
   for offset in countUp(0, length - 1):
     let refOff = refStart + offset
     let readOff = readStart + offset
-    self.storage.recordMatch(refOff, read.baseAt(readOff),
-                               self.matchQualityAt(read, readOff, self.useMQ),
-                               read.flag.reverse,
-                               reference.baseAt(refOff))
+    let bq = int(read.baseQualityAt(readOff))
+    if bq >= minBQ:
+      self.storage.recordMatch(refOff, read.baseAt(readOff),
+                                self.matchQualityAt(read, readOff, self.useMQ),
+                                read.flag.reverse,
+                                reference.baseAt(refOff))
+    else:
+      self.storage.recordMatch(refOff, read.baseAt(readOff),
+                                -1,# flag for later filtering
+                                read.flag.reverse,
+                                reference.baseAt(refOff))
     # Here we also need to record the indel qualities emitted from matches.
     # Just be careful to not count twice (hence check next op if at the end)
     if offset < length-1:

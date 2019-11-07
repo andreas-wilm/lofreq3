@@ -36,7 +36,7 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
                   nextevent: CigarElement,
                   processor: var TProcessor,
                   read: Record, reference: TSequence,
-                  readOffset: int, refOffset: int): (int, int) {.inline.} =
+                  readOffset: int, refOffset: int, minBQ: int): (int, int) {.inline.} =
   ## Processes one event (cigar element) on the read and returns the updated
   ## offset. The event is described by the first argument, 'event'.
   ## The parameter 'processor' provides a reference to the processor used to
@@ -58,7 +58,7 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
   if consumes.query and consumes.reference:
     # mutual, process all matches
     processor.processMatches(readOffset, refOffset, event.len,
-                    read, reference, nextevent)
+                    read, reference, nextevent, minBQ)
     return (readOffset + event.len, refOffset + event.len)
 
   elif consumes.reference:# also true for 'N'
@@ -92,7 +92,7 @@ proc valid(cigar: Cigar): bool {.inline.} =
 
 
 proc pileup*(fai: Fai, records: RecordFilter, region: Region,
-  useMQ: bool, handler: DataToVoid, mincov = 1, maxcov = high(int)): void {.inline.} =
+  useMQ: bool, handler: DataToVoid, mincov = 1, maxcov = high(int), minBQ = 3): void {.inline.} =
   ## Performs a pileup over all reads provided by records
 
   var reference: ISequence# our own type, hence using loadSequence below
@@ -129,7 +129,7 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
         if idx+1 < len(cigar):
           nextevent = cigar[idx+1]
         (readOffset, refOffset) = processEvent(
-          event, nextevent, processor, read, reference, readOffset, refOffset)
+          event, nextevent, processor, read, reference, readOffset, refOffset, minBQ)
 
   # inform the processor that the pileup is done
   processor.done()

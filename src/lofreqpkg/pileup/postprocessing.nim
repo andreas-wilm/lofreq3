@@ -16,6 +16,10 @@ proc toJson*(data: PositionData): JsonNode =
   %data
 
 
+proc toJsonAndPrettyPrint*(data: PositionData): void =
+  writeLine(stdout, pretty(%data))
+
+
 proc toJsonAndPrint*(data: PositionData): void =
   ## Converts the given PositionData object into a JsonNode.
   writeLine(stdout, %data)

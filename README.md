@@ -36,7 +36,7 @@ datasets. Nucleic Acids Res. 2012;
     - [Overview of the workflow](#overview-of-the-workflow)
     - [Preprocessing of your BAM file](#preprocessing-of-your-bam-file)
     - [Pileup](#pileup-1)
-      - [Note on Illumina's Read Segment Quality Control Indicator](#note-on-illuminas-read-segment-quality-control-indicator)
+      - [Notes on Illumina's Read Segment Quality Control Indicator](#notes-on-illuminas-read-segment-quality-control-indicator)
     - [Variant Calling](#variant-calling)
     - [Postprocessing of variants](#postprocessing-of-variants)
   - [Installation](#installation)
@@ -128,13 +128,19 @@ wrongly mapped (`p_m`) or if that's not the case (`1-p_m`) then the base/indel m
 aligned (`p_a`) and if it's neither mismapped nor misaligned
 `(1-p_m)*(1-p_a)` then it might still be a wrongly read base/indel (`p_b`).
 
-#### Note on Illumina's Read Segment Quality Control Indicator
+#### Notes on Illumina's Read Segment Quality Control Indicator
 
-A base quality of value 2 is used by Illumina as so called "Read Segment Quality
+A base quality (BQ) of value 2 (ASCII: #) is used by Illumina as so called "Read Segment Quality
 Control Indicator". Here, the quality of 2 is in fact not a quality or error
 probability, but just means that the sequencing machine wasn't sure about an
-entire segment in the read. This obviously affects LoFreq, which treat these as
-bases/indels with high error probabilty.
+entire segment in the read. This affects LoFreq, which treats qualities as error probabilties, and thus bases with low quality as
+bases with high error probabilty.
+
+To deal with this problem all bases with BQ=2 are marked by the pileup function with a quality of -1 (argument `--minBQ`). And matches/mismatches with quality <0 are ignored by the variant calling routine. This effectively filters bases with BQ2, but still keeps them visible in the pileup (with quality -1).
+
+Variant calls at position with lots of bases with BQ2 are to be taken with a grain of salt. You can get very different results depending on whether you include them (SNV call less likely because of perceived high chances of error) or not (SNV call more likely).
+
+We discourage users from changing the default of `--minBQ 3`. LoFreq is build to deal with erros and excessive filtering will bias results.
 
 ### Variant Calling
 
@@ -198,7 +204,7 @@ In order of importance:
   - CI on Github
   - Note: If nimble test is too limiting: https://github.com/ryanlayer/ssshtest
 - Implement filter or bcftools recipes (and add docs)
-- Wrapper: Multithreaded pileup and call as one, with region inference (and add docs)
+- Parallelism: reader to queue with async calling (sidestepping json conversion)
 - Add workflow and container for end to end processing with old LoFreq. Consider adding BAQ and indel multiplexed before sorting
 - Create release with static binary and announce availability
 - Contain viterbi, indelqul and alnqual somehow as libs and link
@@ -209,4 +215,6 @@ In order of importance:
   - FAQ
   - Split usage from explanation and add section for the impatient
 - Performance
+  - even the release compiled version is a few times slower then the old version (write version that
+    skips that parsing just for benchmark purposes?)
   - Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode
