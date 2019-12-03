@@ -11,7 +11,7 @@
 
 # standard library
 import math
-import strformat
+#import strformat
 # project specific
 import deques
 import containers/positionData
@@ -22,7 +22,7 @@ import ../../region
 ## Defines a type of the expected submit procedure. It should consume a
 ## 'PositionData' object without returning a result (since the storage should
 ## not be responsible for processing any data after it is collected.
-type DataToVoid* =  proc(data: PositionData): void
+type DataToVoid* =  proc(data: PositionData): void 
 
 ## Defines a type which can be wrapped into a submit procedure type
 ## 'DataToVoid' with a discard operation.
@@ -145,7 +145,7 @@ proc ensureStorage(self: SlidingDeque, position:int,
 
 
 proc recordMatch*(self: SlidingDeque, position: int,
-                  base: char, quality: int, reversed: bool,
+                  base: string, quality: int, reversed: bool,
                   refBase: char): void {.inline.} =
   ## Records match event information on for a given position.
   self.ensureStorage(position, refBase)

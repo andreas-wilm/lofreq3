@@ -9,7 +9,8 @@ import json
 # third party
 # project specific
 import storage/containers/positionData
-
+import ../call
+import ../vcf
 
 proc toJson*(data: PositionData): JsonNode =
   ## Converts the given PositionData object into a JsonNode.
@@ -28,3 +29,9 @@ proc toJsonAndPrint*(data: PositionData): void =
 proc doNothing*(data: PositionData): void =
   discard true
 
+
+proc callAndPrint*(plp: PositionData): void =
+  let minQual: int = 20
+  let minAF: float = 0.005
+  for v in call(plp, minQual, minAF):
+    echo $v

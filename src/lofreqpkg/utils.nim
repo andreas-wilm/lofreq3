@@ -5,7 +5,7 @@
 
 
 import math
-import strutils
+#import strutils
 import times
 
 const REF_SYMBOL_AT_INDEL_FW* = '-'

@@ -18,17 +18,23 @@ import strutils
 type OperationData*[T] = object
   ## The 'OperationData' type. It makes and provides a histogram on operation
   ## values and their qualities
-  histogram: QualityHistogram[T]
+  histogram*: QualityHistogram[T]
 
 
 proc coverage*(self: OperationData): Natural =
-    coverage(self.histogram)
+  coverage(self.histogram)
 
 
 proc initOperationData*[T](): OperationData[T] {.inline.} =
   ## Creates a new 'OperationData' object. All that it needs is the type for
   ## the operation values.
   OperationData[T](histogram: initQualityHistogram[T]())
+
+
+proc clean*[T](self: var OperationData[T]): void =
+  ## removes filtered entries, i.e those with q<0 that are kept
+  ## for debugging in pileup but not to be removed before calling
+  self.histogram.clean()
 
 
 proc add*[T](self: var OperationData, bases: T, quality: int,

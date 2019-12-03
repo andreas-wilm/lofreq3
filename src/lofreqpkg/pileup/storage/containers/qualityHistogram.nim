@@ -34,6 +34,28 @@ proc coverage*[T](table: QualityHistogram[T]): Natural =
   return s
 
 
+proc clean*[T](self: var QualityHistogram[T]): void =
+  ## removes filtered entries, i.e those with q<0 that are kept
+  ## for debugging in pileup but not to be removed before calling
+
+  for event in self.keys():# can't use pairs because we need qHist to be writable
+    var qHist = self[event]
+    # FIXME del not supported for CountTable?
+    # https://stackoverflow.com/questions/59160984/remove-key-from-counttable-in-nim
+    # qHist.del(qual)
+    # Workaround is to track in eventCounts
+    var eventCounts = 0
+    for qual in qHist.keys():
+      if qual < 0:# ignore everything filtered (marked as -1 in pileup)
+        self[event][qual] = 0# qHist is just a copy here?!
+      else:
+        inc(eventCounts, self[event][qual])
+    # delete zombie entries (those with only filtered events)
+    #if len(self[event]) == 0:
+    if eventCounts == 0:
+      self.del(event)
+
+
 proc add*[T](self: var QualityHistogram[T], value: T,
              quality: int): void {.inline.} =
   ## Accounts for a event with the given value and the given quality.
@@ -43,7 +65,7 @@ proc add*[T](self: var QualityHistogram[T], value: T,
 
 proc `%`*[T](table: var QualityHistogram[T]): JsonNode {.inline.} =
   result = newJObject()
-  
+
   var buff = initOrderedTable[string, JsonNode]()
   for pair in table.pairs:
     buff[$pair[0]] = %pair[1]

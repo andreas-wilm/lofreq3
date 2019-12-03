@@ -10,7 +10,7 @@ import lofreqpkg/pileup/pileup as lofreq_pileup
 
 when isMainModule:
   dispatch_multi(
-    [call, help={"plpFname": "Pileup file name (LoFreq JSON format)"}],
+    [callFromPlp, help={"plpFname": "Pileup file name (LoFreq JSON format)"}],
     [pileup, help={"bamFname": "BAM file",
                     "noMQ": "Ignore mapping quality",
                     "faFname": "Fasta reference (indexed)"}]

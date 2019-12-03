@@ -14,14 +14,14 @@
 
 # standard library
 #import strutils
-import logging
+# import logging
 #import math
 # third party
 import hts
 # project specific
 import ../utils
 
-var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
+#var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
 
 const DEFAULT_BLANK_QUALITY = -1
@@ -159,12 +159,12 @@ proc processMatches*[TSequence](self: Processor,
     let readOff = readStart + offset
     let bq = int(read.baseQualityAt(readOff))
     if bq >= minBQ:
-      self.storage.recordMatch(refOff, read.baseAt(readOff),
+      self.storage.recordMatch(refOff, $read.baseAt(readOff),
                                 self.matchQualityAt(read, readOff, self.useMQ),
                                 read.flag.reverse,
                                 reference.baseAt(refOff))
     else:
-      self.storage.recordMatch(refOff, read.baseAt(readOff),
+      self.storage.recordMatch(refOff, $read.baseAt(readOff),
                                 -1,# flag for later filtering
                                 read.flag.reverse,
                                 reference.baseAt(refOff))
@@ -212,7 +212,7 @@ proc processDeletion*[TSequence](self: Processor,
   var value = ""
   for offset in countUp(refStart, refStart + length - 1):
     value &= reference.baseAt(offset)
-    self.storage.recordMatch(offset, DEFAULT_BLANK_SYMBOL,
+    self.storage.recordMatch(offset, $DEFAULT_BLANK_SYMBOL,
                              DEFAULT_BLANK_QUALITY,
                              read.flag.reverse,
                              reference.baseAt(offset))

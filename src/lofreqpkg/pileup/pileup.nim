@@ -7,9 +7,9 @@
 ## - License: The MIT License
 
 # standard
-import os
+#import os
 import hts
-import interfaces/iSequence
+#import interfaces/iSequence
 import storage/slidingDeque
 import recordFilter
 import algorithm
@@ -20,8 +20,7 @@ import strutils
 
 # project specific
 import ../region
-
-
+import ../vcf
 var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
 
@@ -65,12 +64,15 @@ proc full_pileup*(bamFname: string, faFname = "", regions = "",
     var records = newRecordFilter(bam, reg.sq, reg.s, reg.e)
 
     let time = cpuTime()
-    algorithm.pileup(fai, records, reg, useMQ, handler, mincov, maxcov, minBQ)
-    logger.log(lvlInfo, "Time taken to pileup reference ", reg.sq, " ", cpuTime() - time)
+    algorithm.pileup(fai, records, reg, useMQ, handler,
+                     mincov, maxcov, minBQ)
+    logger.log(lvlInfo, "Time taken to pileup reference ",
+      reg.sq, " ", cpuTime() - time)
 
 
-proc pileup*(bamFname: string, regions: string, noMQ: bool = false, faFname = "",
-             mincov = 1, maxcov = high(int), pretty = false, minBQ = 3, loglevel = 0) =
+proc pileup*(bamFname: string, regions: string, noMQ: bool = false,
+             faFname = "", mincov = 1, maxcov = high(int), pretty = false,
+             minBQ = 3, loglevel = 0, callNow = false) =
 
   if logLevel >= 3:
     setLogFilter(lvlDebug)
@@ -86,11 +88,20 @@ proc pileup*(bamFname: string, regions: string, noMQ: bool = false, faFname = ""
   #full_pileup(bamFname, faFname, doNothing)
   var p: DataToVoid
   if pretty:
+    if callNow:
+      quit("Cannot print pileup and call at the same time")
     p = toJsonAndPrettyPrint
     logger.log(lvlWarn, "Pretty printing is good for debugging, but cannot be used for calling")
-
+  elif callNow:
+    echo vcfHeader()
+    #let minQual = 20
+    #let minAF = 0.005
+    # FIXME
+    logger.log(lvlWarn, "hardcoded minAF and minQual")
+    p = callAndPrint
   else:
     p = toJsonAndPrint
+
   full_pileup(bamFname, faFname, regions, not noMQ, p, mincov, maxcov, minBQ)
 
 

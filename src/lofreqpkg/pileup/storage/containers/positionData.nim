@@ -14,6 +14,7 @@
 # standard
 import json
 # third party
+# /
 # project specific
 import operationData
 
@@ -22,11 +23,11 @@ type PositionData* = ref object
     ## The 'PositionData' object keeping all information concerning one parti-
     ## cular position on the reference.
     refIndex*: int
-    refBase: char
-    chromosome: string
-    matches: OperationData[char]
-    deletions: OperationData[string]
-    insertions: OperationData[string]
+    refBase*: char
+    chromosome*: string
+    matches*: OperationData[string]# char would do, but string to make it consistent
+    deletions*: OperationData[string]
+    insertions*: OperationData[string]
 
 
 proc coverage*(pd: PositionData): Natural =
@@ -46,13 +47,13 @@ proc newPositionData*(refIndex: int, refBase: char,
     refIndex: refIndex,
     refBase: refBase,
     chromosome: chromosome,
-    matches: initOperationData[char](),
+    matches: initOperationData[string](),
     insertions: initOperationData[string](),
     deletions: initOperationData[string]()
   )
 
 
-proc addMatch*(self: var PositionData, base: char, quality: int,
+proc addMatch*(self: var PositionData, base: string, quality: int,
                reverse: bool) {.inline.} =
   ## Accounts for a match on the position represented by this object.  In the
   ## most common basic biological use case, a match should either be a true

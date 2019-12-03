@@ -15,19 +15,21 @@ from hts/stats import fishers_exact_test
 # project specific
 import vcf
 import utils
+import pileup/storage/containers/operationData
+import pileup/storage/containers/qualityHistogram
+import pileup/storage/containers/positionData
 
-
-type QualHist = Table[string, CountTable[int]]
-
-type PositionData = object
-    ## The 'PositionData' object keeping all information concerning one parti-
-    ## cular position on the reference.
-    refIndex: int
-    refBase: char
-    chromosome: string
-    matches: QualHist
-    deletions: QualHist
-    insertions: QualHist
+#type QualHist = Table[string, CountTable[int]]
+#
+#type PositionData = object
+#    ## The 'PositionData' object keeping all information concerning one parti-
+#    ## cular position on the reference.
+#    refIndex: int
+#    refBase: char
+#    chromosome: string
+#    matches: QualHist
+#    deletions: QualHist
+#    insertions: QualHist
 
 type VarType = enum snp, ins, del
 
@@ -134,14 +136,14 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
 
 
 ## brief parse quality histogram for all operations from json node
-proc parseOperationData(node: JsonNode): QualHist =
+proc parseOperationData(node: JsonNode): QualityHistogram =
   result = initTable[string, CountTable[int]]()
 
   for event, qHist in node.pairs():
     discard result.hasKeyOrPut(event, initCountTable[int]())
     for qual, count in qHist.pairs():
       let q = parseInt($qual)
-      if q<0:# ignore everything filtered
+      if q<0:# ignore everything filtered (marked as -1 in pileup)
         continue
       let c = count.getInt
 
@@ -151,6 +153,7 @@ proc parseOperationData(node: JsonNode): QualHist =
     if len(result[event]) == 0:
       result.del(event)
 
+
 ## brief parse pileup object from json
 proc parsePlpJson(jsonString: string): PositionData =
   let dataJson = parseJson(jsonString)
@@ -158,15 +161,13 @@ proc parsePlpJson(jsonString: string): PositionData =
   assert dataJson.kind == JObject
   # FIXME should we validate the keys before starting to parse?
   # what about extra keys for example. should they be ignored?
-
-  result.chromosome = dataJson["CHROM"].getStr
-  result.refIndex =  dataJson["POS"].getInt
-  # could ignore lower case (masking) here if needed as feature
-  result.refBase = dataJson["REF"].getStr[0].toUpperAscii()
-
-  result.matches = parseOperationData(dataJson["M"])
-  result.insertions = parseOperationData(dataJson["I"])
-  result.deletions = parseOperationData(dataJson["D"])
+  result = PositionData(refIndex: dataJson["POS"].getInt,
+    refBase: dataJson["REF"].getStr[0].toUpperAscii(),  # could ignore lower case (masking) here if needed as feature
+    chromosome: dataJson["CHROM"].getStr)
+  #  matches: parseOperationData(dataJson["M"]),
+  #  insertions: parseOperationData(dataJson["I"]),
+  #  deletions: parseOperationData(dataJson["D"]))
+  assert(false, "FIXME json parsing broken")
 
 
 proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
@@ -188,7 +189,8 @@ proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
   result.vtype = $vtype
 
 
-proc getCountsAndEProbs[T](opData: T, vartype: VarType): (seq[float], Natural, CountTable[string], CountTable[string]) =
+proc getCountsAndEProbs[T](opData: T, vartype: VarType):
+  (seq[float], Natural, CountTable[string], CountTable[string]) =
   # fill array of error probabilities, set baseCounts and baseCountsStranded.
   # note that base's strand is indicated by its case.
   var eProbs: seq[float] = @[]# base error probabilites
@@ -196,7 +198,7 @@ proc getCountsAndEProbs[T](opData: T, vartype: VarType): (seq[float], Natural, C
   var baseCountsStranded = initCountTable[string]()# strand aware counts
   var coverage: Natural = 0
 
-  for base, qhist in pairs(opData):
+  for base, qhist in pairs(opData.histogram):
     var thisBaseCount = 0
     if vartype == snp:
       assert len(base) == 1
@@ -204,21 +206,21 @@ proc getCountsAndEProbs[T](opData: T, vartype: VarType): (seq[float], Natural, C
       assert count>=0
       thisBaseCount += count
       # snp: '*' are deletions, i.e. physical coverage (count) with q=-1 (ignore)
-      if vartype == snp and base == $DEFAULT_BLANK_SYMBOL:
+      if vartype == snp and $base == $DEFAULT_BLANK_SYMBOL:
         continue
       assert qual>=0
       let e = qual2prob(qual)
       for i in countup(1, count):
         eProbs.add(e)
-    baseCountsStranded.inc(base, thisBaseCount)
-    baseCounts.inc(base.toUpperAscii, thisBaseCount)
+    baseCountsStranded.inc($base, thisBaseCount)
+    baseCounts.inc($base.toUpperAscii, thisBaseCount)
     coverage += thisBaseCount
 
   return (eProbs, coverage, baseCounts, baseCountsStranded)
 
 
 ## result is a sequence, because we might return multiple variants for this position
-proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Variant] =#{.gcsafe.} =
+proc call*(plp: PositionData, minQual: int, minAF: float): seq[Variant] =
   var eprobs: seq[float]
   var coverage: Natural
   var baseCounts: CountTable[string]
@@ -227,10 +229,13 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
   for vartype in low(VarType)..high(VarType):
     # FIXME there got ot be an easier way to do this
     if vartype == snp:
+      plp.matches.clean()
       (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.matches, snp)
     elif vartype == ins:
+      plp.insertions.clean()
       (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.insertions, ins)
     elif vartype == del:
+      plp.deletions.clean()
       (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.deletions, del)
     else:
       raise newException(ValueError, "Illegal vartype" & $vartype)
@@ -247,10 +252,9 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
       if c > maxAltCount:
         maxAltCount = c
 
-
     # loop over altBases and determine whether they are variants
     let maxAF = maxAltCount/coverage
-    if maxAF >= minAF and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
+    if (maxAF >= minAF) and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
       logger.log(lvlDebug, fmt"Testing {vartype} at {plp.chromosome}:{plp.refIndex}: {baseCounts}")
       #logger.log(lvlDebug, fmt"eprobs  {eprobs}")
       let probVec = prunedProbDist(eProbs, maxAltCount)# FIXME call "by reference" to safe memory?
@@ -293,12 +297,12 @@ proc call(plp: PositionData, minQual: int = 20, minAF: float = 0.005): seq[Varia
 
         var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
           id : ".", refBase : varRefBase, alt : varAltBase, qual : qual, filter : ".")
-        vcfVar.info = setVarInfo(af, coverage, plp.refBase, altBase, baseCountsStranded, vartype)
+        vcfVar.info = setVarInfo(af, coverage, plp.refBase, altBase,
+          baseCountsStranded, vartype)
         result.add(vcfVar)
 
 
-proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005, logLevel = 0) =
-
+proc callFromPlp*(plpFname: string, minQual: int = 20, minAF: float = 0.005, logLevel = 0) =
   if logLevel >= 3:
     setLogFilter(lvlDebug)
   elif logLevel == 2:
@@ -319,9 +323,8 @@ proc call*(plpFname: string, minQual: int = 20, minAF: float = 0.005, logLevel =
 
   for line in plpFh.lines:
     var plp = parsePlpJson(line)
-    let vcfVars = call(plp, minQual, minAF)
-    if len(vcfVars) > 0:
-      echo vcfVars.join("\n")
+    for v in call(plp, minQual, minAF):
+      echo $v
   logger.log(lvlDebug, "Done. Goodbye")
 
 
