@@ -21,6 +21,7 @@ import strutils
 # project specific
 import ../region
 import ../vcf
+import ../call
 var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
 
@@ -71,8 +72,15 @@ proc full_pileup*(bamFname: string, faFname = "", regions = "",
 
 
 proc pileup*(bamFname: string, regions: string, noMQ: bool = false,
-             faFname = "", mincov = 1, maxcov = high(int), pretty = false,
-             minBQ = 3, loglevel = 0, callNow = false) =
+             faFname = "",
+             minAF: float = DEFAULT_MIN_AF, 
+             minVarQual: int = DEFAULT_MIN_VAR_QUAL,
+             minCov = 1,
+             maxCov = high(int),
+             minBQ = 3,
+             loglevel = 0,
+             json = false,
+             pretty = false) =
 
   if logLevel >= 3:
     setLogFilter(lvlDebug)
@@ -85,23 +93,21 @@ proc pileup*(bamFname: string, regions: string, noMQ: bool = false,
   else:
     quit("Invalid log level")
 
-  #full_pileup(bamFname, faFname, doNothing)
   var p: DataToVoid
-  if pretty:
-    if callNow:
-      quit("Cannot print pileup and call at the same time")
-    p = toJsonAndPrettyPrint
-    logger.log(lvlWarn, "Pretty printing is good for debugging, but cannot be used for calling")
-  elif callNow:
-    echo vcfHeader()
-    #let minQual = 20
-    #let minAF = 0.005
-    # FIXME
-    logger.log(lvlWarn, "hardcoded minAF and minQual")
-    p = callAndPrint
+  if json:
+    if pretty:
+      logger.log(lvlWarn, "Pretty printing is good for debugging, but cannot be used for calling")
+      p = toJsonAndPrettyPrint
+    else:
+      p = toJsonAndPrint
   else:
-    p = toJsonAndPrint
-
+    if pretty:
+      quit("Pretty print can only be used in conjuction with json")
+    echo vcfHeader()
+    params.minVarQual = minVarQual
+    params.minAF  = minAF
+    p = callAndPrint
+  
   full_pileup(bamFname, faFname, regions, not noMQ, p, mincov, maxcov, minBQ)
 
 

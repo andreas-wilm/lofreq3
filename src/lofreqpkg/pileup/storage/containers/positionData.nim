@@ -52,6 +52,20 @@ proc newPositionData*(refIndex: int, refBase: char,
     deletions: initOperationData[string]()
   )
 
+# FIXME there surely must be a Nimsy way of templating the following
+# three function
+proc setMatch*(self: var PositionData, base: string, quality: int,
+               count: int) {.inline.} =
+  self.matches.set(base, quality, count)
+
+proc setInsertion*(self: var PositionData, base: string, quality: int,
+               count: int) {.inline.} =
+  self.insertions.set(base, quality, count)
+
+proc setDeletion*(self: var PositionData, base: string, quality: int,
+               count: int) {.inline.} =
+  self.deletions.set(base, quality, count)
+
 
 proc addMatch*(self: var PositionData, base: string, quality: int,
                reverse: bool) {.inline.} =

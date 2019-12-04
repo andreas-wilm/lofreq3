@@ -40,10 +40,9 @@ proc clean*[T](self: var QualityHistogram[T]): void =
 
   for event in self.keys():# can't use pairs because we need qHist to be writable
     var qHist = self[event]
-    # FIXME del not supported for CountTable?
+    # del not supported for CountTable but setting to 0 has the same effect:
     # https://stackoverflow.com/questions/59160984/remove-key-from-counttable-in-nim
-    # qHist.del(qual)
-    # Workaround is to track in eventCounts
+    # still need to track zombie entries with eventCounts because len doesn't change (see above)
     var eventCounts = 0
     for qual in qHist.keys():
       if qual < 0:# ignore everything filtered (marked as -1 in pileup)
@@ -54,6 +53,13 @@ proc clean*[T](self: var QualityHistogram[T]): void =
     #if len(self[event]) == 0:
     if eventCounts == 0:
       self.del(event)
+
+
+proc set*[T](self: var QualityHistogram[T], value: T,
+             quality: int, count: int): void {.inline.} =
+  ## Accounts for a event with the given value and the given quality.
+  discard self.hasKeyOrPut(value, initCountTable[int]())
+  self[value][quality] = count
 
 
 proc add*[T](self: var QualityHistogram[T], value: T,

@@ -10,8 +10,18 @@ import lofreqpkg/pileup/pileup as lofreq_pileup
 
 when isMainModule:
   dispatch_multi(
-    [callFromPlp, help={"plpFname": "Pileup file name (LoFreq JSON format)"}],
+    [callFromPlp, help={"plpFname": "pileup file name (LoFreq JSON format)",
+                        "minVarQual": "minimum variant quality",
+                        "minAF": "minimum variant frequency"}],
     [pileup, help={"bamFname": "BAM file",
-                    "noMQ": "Ignore mapping quality",
-                    "faFname": "Fasta reference (indexed)"}]
+                   "faFname": "fasta reference (indexed)",
+                   "json": "print pileup as json (don't call variants; see also 'pretty')",
+                   "minAF": "minimum variant frequency for variants",
+                   "minBQ": "ignore bases with base quality below this value",
+                   "maxCov": "ignore positions with coverage above this value",
+                   "minCov": "ignore positions with coverage below this value",
+                   "minVarQual": "minimum variant quality",
+                   "noMQ": "ignore mapping quality",
+                   "pretty": "pretty JSON output (cannot be used with callNow)",
+                   }]
   )

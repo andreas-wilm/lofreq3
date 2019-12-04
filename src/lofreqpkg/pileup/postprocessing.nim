@@ -31,7 +31,5 @@ proc doNothing*(data: PositionData): void =
 
 
 proc callAndPrint*(plp: PositionData): void =
-  let minQual: int = 20
-  let minAF: float = 0.005
-  for v in call(plp, minQual, minAF):
+  for v in call(plp):
     echo $v

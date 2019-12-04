@@ -19,21 +19,21 @@ import pileup/storage/containers/operationData
 import pileup/storage/containers/qualityHistogram
 import pileup/storage/containers/positionData
 
-#type QualHist = Table[string, CountTable[int]]
-#
-#type PositionData = object
-#    ## The 'PositionData' object keeping all information concerning one parti-
-#    ## cular position on the reference.
-#    refIndex: int
-#    refBase: char
-#    chromosome: string
-#    matches: QualHist
-#    deletions: QualHist
-#    insertions: QualHist
-
 type VarType = enum snp, ins, del
 
+const
+  DEFAULT_MIN_VARQUAL* = 20
+  DEFAULT_MIN_AF* = 0.005
+
+type CallParams* = object
+  minVarQual*: int
+  minAF*: float
+
+var params*: CallParams
+params = CallParams(minVarQual:DEFAULT_MIN_VAR_QUAL, minAF:DEFAULT_MIN_AF)
+
 var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
+
 
 
 ## brief Computes log(exp(logA) + exp(logB))
@@ -136,38 +136,32 @@ proc prunedProbDist*(errProbs: openArray[float],# FIXME use ref to safe mem?
 
 
 ## brief parse quality histogram for all operations from json node
-proc parseOperationData(node: JsonNode): QualityHistogram =
-  result = initTable[string, CountTable[int]]()
-
+## and populate opsData using its set function
+proc parseOperationData(node: JsonNode, opsData: var OperationData[string]) =
   for event, qHist in node.pairs():
-    discard result.hasKeyOrPut(event, initCountTable[int]())
     for qual, count in qHist.pairs():
       let q = parseInt($qual)
-      if q<0:# ignore everything filtered (marked as -1 in pileup)
-        continue
       let c = count.getInt
-
-      assert result[event].hasKey(q) == false
-      result[event][q] = c
-    # delete zombie entries (those with only filtered events)
-    if len(result[event]) == 0:
-      result.del(event)
+      opsData.set(event, q, c)
 
 
 ## brief parse pileup object from json
 proc parsePlpJson(jsonString: string): PositionData =
   let dataJson = parseJson(jsonString)
-  # assert used in nim in action after parsing json string
+  # the following assert is also used in 'nim in action' after parsing json string
   assert dataJson.kind == JObject
-  # FIXME should we validate the keys before starting to parse?
-  # what about extra keys for example. should they be ignored?
-  result = PositionData(refIndex: dataJson["POS"].getInt,
-    refBase: dataJson["REF"].getStr[0].toUpperAscii(),  # could ignore lower case (masking) here if needed as feature
-    chromosome: dataJson["CHROM"].getStr)
-  #  matches: parseOperationData(dataJson["M"]),
-  #  insertions: parseOperationData(dataJson["I"]),
-  #  deletions: parseOperationData(dataJson["D"]))
-  assert(false, "FIXME json parsing broken")
+
+  let refIndex = dataJson["POS"].getInt
+  let refBase = dataJson["REF"].getStr[0].toUpperAscii()# could ignore lower case (masking) here if needed as feature
+  let chromosome = dataJson["CHROM"].getStr
+  result = newPositionData(refIndex, refBase, chromosome)
+
+  parseOperationData(dataJson["M"], result.matches)
+  parseOperationData(dataJson["I"], result.insertions)
+  parseOperationData(dataJson["D"], result.deletions)
+
+  # FIXME what about extra keys?
+  # FIXME what about missing keys? try here?
 
 
 proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
@@ -220,7 +214,7 @@ proc getCountsAndEProbs[T](opData: T, vartype: VarType):
 
 
 ## result is a sequence, because we might return multiple variants for this position
-proc call*(plp: PositionData, minQual: int, minAF: float): seq[Variant] =
+proc call*(plp: PositionData): seq[Variant] =
   var eprobs: seq[float]
   var coverage: Natural
   var baseCounts: CountTable[string]
@@ -254,7 +248,7 @@ proc call*(plp: PositionData, minQual: int, minAF: float): seq[Variant] =
 
     # loop over altBases and determine whether they are variants
     let maxAF = maxAltCount/coverage
-    if (maxAF >= minAF) and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
+    if (maxAF >= params.minAF) and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
       logger.log(lvlDebug, fmt"Testing {vartype} at {plp.chromosome}:{plp.refIndex}: {baseCounts}")
       #logger.log(lvlDebug, fmt"eprobs  {eprobs}")
       let probVec = prunedProbDist(eProbs, maxAltCount)# FIXME call "by reference" to safe memory?
@@ -270,7 +264,7 @@ proc call*(plp: PositionData, minQual: int, minAF: float): seq[Variant] =
 
         # need to check minAF again, because test above was for most frequent base only
         let af = altCount/coverage
-        if af < minAF or altCount == 0:
+        if af < params.minAF or altCount == 0:
           #echo "DEBUG af<minAF for " & altBase & ":" & $altCount & " = " & $af & "<" & $minAF
           break# early exit possible since baseCounts are sorted
 
@@ -278,7 +272,7 @@ proc call*(plp: PositionData, minQual: int, minAF: float): seq[Variant] =
         let pvalue = exp(probvecTailSum(probVec, altCount))
         let qual = prob2qual(pvalue)
         logger.log(lvlDebug, fmt"af={af:.6f} altCount={altCount} for {vartype} {altBase} gives qual={qual}")
-        if qual < minQual:
+        if qual < params.minVarQual:
           #echo "DEBUG qual<minQual for " & altBase & ":" & $altCount & " = " & $qual & "<" & $minQual
           break# early exit possible since baseCounts are sorted
 
@@ -302,7 +296,8 @@ proc call*(plp: PositionData, minQual: int, minAF: float): seq[Variant] =
         result.add(vcfVar)
 
 
-proc callFromPlp*(plpFname: string, minQual: int = 20, minAF: float = 0.005, logLevel = 0) =
+proc callFromPlp*(plpFname: string, minVarQual: int = DEFAULT_MIN_VAR_QUAL,
+                  minAF: float = DEFAULT_MIN_AF, logLevel = 0) =
   if logLevel >= 3:
     setLogFilter(lvlDebug)
   elif logLevel == 2:
@@ -316,6 +311,9 @@ proc callFromPlp*(plpFname: string, minQual: int = 20, minAF: float = 0.005, log
 
   echo vcfHeader()
 
+  params.minVarQual = minVarQual
+  params.minAF = minAF
+
   var plpFh: File = if plpFname == "-": stdin else: open(plpFname)
   defer:
     if plpFh != stdin:
@@ -323,7 +321,7 @@ proc callFromPlp*(plpFname: string, minQual: int = 20, minAF: float = 0.005, log
 
   for line in plpFh.lines:
     var plp = parsePlpJson(line)
-    for v in call(plp, minQual, minAF):
+    for v in call(plp):
       echo $v
   logger.log(lvlDebug, "Done. Goodbye")
 

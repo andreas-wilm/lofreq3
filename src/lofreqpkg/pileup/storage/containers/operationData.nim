@@ -37,6 +37,12 @@ proc clean*[T](self: var OperationData[T]): void =
   self.histogram.clean()
 
 
+
+proc set*[T](self: var OperationData, bases: T, quality: int,
+  count: int): void {.inline.} =
+  self.histogram.set(bases, quality, count)
+
+
 proc add*[T](self: var OperationData, bases: T, quality: int,
              reverse: bool): void {.inline.} =
   ## Accounts for one specific operation. Distinct oprations of the same kind
