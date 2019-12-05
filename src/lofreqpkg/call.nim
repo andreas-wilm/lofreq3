@@ -154,7 +154,7 @@ proc parsePlpJson(jsonString: string): PositionData =
   assert dataJson.kind == JObject
 
   let refIndex = dataJson["POS"].getInt
-  let refBase = dataJson["REF"].getStr[0].toUpperAscii()# could ignore lower case (masking) here if needed as feature
+  let refBase = dataJson["REF"].getStr[0]
   let chromosome = dataJson["CHROM"].getStr
   result = newPositionData(refIndex, refBase, chromosome)
 

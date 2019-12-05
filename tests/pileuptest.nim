@@ -32,7 +32,7 @@ suite "pileup tests":
       # that stopped working with newer nim compilers, so we need to call
       # the binary. old: full_pileup(bamFile, faiFile, "ref:1-14", false)#.then(proc (x: JsonNode): void = actual.add(x)))
 
-      let cmd = lofreq & " pileup -b " & bamfile & " -f " & faifile & " -r ref:1-13 --noMQ"
+      let cmd = lofreq & " call -b " & bamfile & " -f " & faifile & " -r ref:1-13 --noMQ -p"
       var outp = execProcess(cmd, options = {poUsePath, poEvalCommand})# disables default poStdErrToStdOut
       outp = "[" & outp.replace("\n", ",") & "]"
       outp = outp.replace(",]", "]")

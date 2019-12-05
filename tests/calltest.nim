@@ -14,7 +14,7 @@ import hts/vcf
 # FIXME how to test main function in call (private and nameclash)?
 
 
-suite "pileup and call":
+suite "call":
 
   # simple test, mainly an excuse to test htsnim vcf
   test "simple-vars":
@@ -23,9 +23,10 @@ suite "pileup and call":
     var tmpname: string
     (tmpfd, tmpname) = mkstemp()
     tmpfd.close
-    let plp_cmd = lofreq & " pileup -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 --noMQ"
-    let call_cmd = lofreq & " call -p - -m 13"
-    let cmd = plp_cmd & " | " & call_cmd & " > " & tmpname
+    #let plp_cmd = lofreq & " pileup -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 --noMQ"
+    #let call_cmd = lofreq & " call -p - -m 13"
+    #let cmd = plp_cmd & " | " & call_cmd & " > " & tmpname
+    let cmd = lofreq & " call -b call_samples/simple-vars.bam -v 13 -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 --noMQ > " & tmpname
     #echo "Testing: " & cmd
     let outp = execProcess(cmd)
     var v:VCF
@@ -50,6 +51,36 @@ suite "pileup and call":
 
     check nvars == 10
 
+  test "direct call vs call from plp":
+    let lofreq = "../lofreq"
+    var
+      tmpfd1: File
+      tmpfd2: File
+    var
+      tmpname1: string
+      tmpname2: string
+
+    (tmpfd1, tmpname1) = mkstemp()
+    tmpfd1.close
+    (tmpfd2, tmpname2) = mkstemp()
+    tmpfd2.close
+
+    #let plp_cmd = lofreq & " pileup -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 --noMQ"
+    #let call_cmd = lofreq & " call -p - -m 13"
+    #let cmd = plp_cmd & " | " & call_cmd & " > " & tmpname
+    let cmd1 = lofreq & " call -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 > " & tmpname1
+    #echo "Testing: " & cmd1
+    discard execProcess(cmd1)
+
+    let plp_cmd = lofreq & " call -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 -p"
+    let call_cmd = lofreq & " call_from_plp -p -"
+    let cmd2 = plp_cmd & " | " & call_cmd & " > " & tmpname2
+    #echo "Testing: " & cmd2
+    discard execProcess(cmd2)
+
+    let diff_cmd = "diffX -q " & tmpname1 & " " & tmpname2
+    discard execProcess(diff_cmd)
+    # FIXME make sure this can fail (diffX, -v 30)
 
 suite "pvalue computation":
 

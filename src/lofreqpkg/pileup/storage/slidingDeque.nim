@@ -11,6 +11,7 @@
 
 # standard library
 import math
+import strutils
 #import strformat
 # project specific
 import deques
@@ -140,8 +141,9 @@ proc ensureStorage(self: SlidingDeque, position:int,
   sanityCheck(self.beginning, length, position)
 
   if position == (self.beginning + length):
-    self.deq.addLast(newPositionData(position+1, refBase,
-                        self.chromosome))
+    self.deq.addLast(newPositionData(position+1, 
+                     refBase.toUpperAscii(),# FIXME support for masking lowercase pos?
+                     self.chromosome))
 
 
 proc recordMatch*(self: SlidingDeque, position: int,
