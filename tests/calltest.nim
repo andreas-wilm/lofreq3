@@ -2,11 +2,11 @@
 import unittest
 import math
 import osproc
-import strutils
+#import strutils
 import tempfile
 # project specific
 import ../src/lofreqpkg/call
-import ../src/lofreqpkg/utils
+#import ../src/lofreqpkg/utils
 # third party
 import hts/vcf
 
@@ -59,28 +59,31 @@ suite "call":
     var
       tmpname1: string
       tmpname2: string
+    var
+      output: TaintedString
+      exitCode: int
 
     (tmpfd1, tmpname1) = mkstemp()
     tmpfd1.close
     (tmpfd2, tmpname2) = mkstemp()
     tmpfd2.close
 
-    #let plp_cmd = lofreq & " pileup -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 --noMQ"
-    #let call_cmd = lofreq & " call -p - -m 13"
-    #let cmd = plp_cmd & " | " & call_cmd & " > " & tmpname
     let cmd1 = lofreq & " call -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 > " & tmpname1
     #echo "Testing: " & cmd1
-    discard execProcess(cmd1)
+    (output, exitCode) = execCmdEx(cmd1)
+    check(exitCode == 0)
 
     let plp_cmd = lofreq & " call -b call_samples/simple-vars.bam -f call_samples/NC_000913.n200.fa -r NC_000913:1-200 -p"
     let call_cmd = lofreq & " call_from_plp -p -"
     let cmd2 = plp_cmd & " | " & call_cmd & " > " & tmpname2
     #echo "Testing: " & cmd2
-    discard execProcess(cmd2)
+    (output, exitCode) = execCmdEx(cmd2)
+    check(exitCode == 0)
 
-    let diff_cmd = "diffX -q " & tmpname1 & " " & tmpname2
-    discard execProcess(diff_cmd)
-    # FIXME make sure this can fail (diffX, -v 30)
+    let diff_cmd = "diff -q " & tmpname1 & " " & tmpname2
+    (output, exitCode) = execCmdEx(diff_cmd)
+    #echo "Diff command: " & diff_cmd
+    check(exitCode == 0)
 
 suite "pvalue computation":
 
