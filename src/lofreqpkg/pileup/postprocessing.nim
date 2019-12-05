@@ -31,5 +31,5 @@ proc doNothing*(data: PositionData): void =
 
 
 proc callAndPrint*(plp: PositionData): void =
-  for v in call(plp):
+  for v in callAtPos(plp):
     echo $v

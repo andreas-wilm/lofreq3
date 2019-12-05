@@ -20,6 +20,25 @@ import storage/slidingDeque
 import processor
 import storage/slidingDeque
 
+const
+  DEFAULT_MIN_COV* = 1
+  DEFAULT_MAX_COV* = high(int)
+  DEFAULT_MIN_BQ* = 3
+  DEFAULT_USE_MQ* = true
+
+type PileupParams* = object
+  minCov*: Natural
+  maxCov*: Natural
+  minBQ*: Natural
+  useMQ*: bool
+  # FIXME add regions to plpParams
+
+
+var plpParams*: PileupParams
+plpParams = PileupParams(minCov: DEFAULT_MIN_COV,
+                         maxCov: DEFAULT_MAX_COV,
+                         minBQ: DEFAULT_MIN_BQ,
+                         useMQ: DEFAULT_USE_MQ)
 
 var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
@@ -92,12 +111,13 @@ proc valid(cigar: Cigar): bool {.inline.} =
 
 
 proc pileup*(fai: Fai, records: RecordFilter, region: Region,
-  useMQ: bool, handler: DataToVoid, mincov = 1, maxcov = high(int), minBQ = 3): void {.inline.} =
+             handler: DataToVoid): void {.inline.} =
   ## Performs a pileup over all reads provided by records
 
   var reference: ISequence# our own type, hence using loadSequence below
-  var storage = newSlidingDeque(records.chromosomeName, region, handler, mincov, maxcov)
-  var processor = newProcessor(storage, useMQ)
+  var storage = newSlidingDeque(records.chromosomeName, region, handler, 
+                                plpParams.mincov, plpParams.maxcov)
+  var processor = newProcessor(storage, plpParams.useMQ)
 
   for read in records:
       # all records come from the same chromosome as guarantted by RecordFilter
@@ -128,8 +148,8 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
         # uninitialized nextevent (= last element) translates to 0M
         if idx+1 < len(cigar):
           nextevent = cigar[idx+1]
-        (readOffset, refOffset) = processEvent(
-          event, nextevent, processor, read, reference, readOffset, refOffset, minBQ)
+        (readOffset, refOffset) = processEvent(event, nextevent,
+          processor, read, reference, readOffset, refOffset, plpParams.minBQ)
 
   # inform the processor that the pileup is done
   processor.done()

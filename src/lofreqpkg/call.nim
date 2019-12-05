@@ -26,14 +26,16 @@ const
   DEFAULT_MIN_AF* = 0.005
 
 type CallParams* = object
-  minVarQual*: int
+  minVarQual*: Natural
   minAF*: float
 
-var params*: CallParams
-params = CallParams(minVarQual:DEFAULT_MIN_VAR_QUAL, minAF:DEFAULT_MIN_AF)
 
-var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
+var callParams*: CallParams
+callParams = CallParams(minVarQual:DEFAULT_MIN_VAR_QUAL,
+                        minAF:DEFAULT_MIN_AF)
 
+var logger = newConsoleLogger(fmtStr = verboseFmtStr,
+                              useStderr = true)
 
 
 ## brief Computes log(exp(logA) + exp(logB))
@@ -214,7 +216,7 @@ proc getCountsAndEProbs[T](opData: T, vartype: VarType):
 
 
 ## result is a sequence, because we might return multiple variants for this position
-proc call*(plp: PositionData): seq[Variant] =
+proc callAtPos*(plp: PositionData): seq[Variant] =
   var eprobs: seq[float]
   var coverage: Natural
   var baseCounts: CountTable[string]
@@ -248,7 +250,7 @@ proc call*(plp: PositionData): seq[Variant] =
 
     # loop over altBases and determine whether they are variants
     let maxAF = maxAltCount/coverage
-    if (maxAF >= params.minAF) and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
+    if maxAF >= callParams.minAF and maxAltCount > 0:# don't even compute probDist if we can't reach minAF with most abundant base
       logger.log(lvlDebug, fmt"Testing {vartype} at {plp.chromosome}:{plp.refIndex}: {baseCounts}")
       #logger.log(lvlDebug, fmt"eprobs  {eprobs}")
       let probVec = prunedProbDist(eProbs, maxAltCount)# FIXME call "by reference" to safe memory?
@@ -264,7 +266,7 @@ proc call*(plp: PositionData): seq[Variant] =
 
         # need to check minAF again, because test above was for most frequent base only
         let af = altCount/coverage
-        if af < params.minAF or altCount == 0:
+        if af < callParams.minAF or altCount == 0:
           #echo "DEBUG af<minAF for " & altBase & ":" & $altCount & " = " & $af & "<" & $minAF
           break# early exit possible since baseCounts are sorted
 
@@ -272,7 +274,7 @@ proc call*(plp: PositionData): seq[Variant] =
         let pvalue = exp(probvecTailSum(probVec, altCount))
         let qual = prob2qual(pvalue)
         logger.log(lvlDebug, fmt"af={af:.6f} altCount={altCount} for {vartype} {altBase} gives qual={qual}")
-        if qual < params.minVarQual:
+        if qual < callParams.minVarQual:
           #echo "DEBUG qual<minQual for " & altBase & ":" & $altCount & " = " & $qual & "<" & $minQual
           break# early exit possible since baseCounts are sorted
 
@@ -290,13 +292,14 @@ proc call*(plp: PositionData): seq[Variant] =
           raise newException(ValueError, "Illegal vartype" & $vartype)
 
         var vcfVar = Variant(chrom : plp.chromosome, pos : plp.refIndex,
-          id : ".", refBase : varRefBase, alt : varAltBase, qual : qual, filter : ".")
+          id : ".", refBase : varRefBase, alt : varAltBase, qual : qual,
+          filter : ".")
         vcfVar.info = setVarInfo(af, coverage, plp.refBase, altBase,
           baseCountsStranded, vartype)
         result.add(vcfVar)
 
 
-proc callFromPlp*(plpFname: string, minVarQual: int = DEFAULT_MIN_VAR_QUAL,
+proc call_from_plp*(plpFname: string, minVarQual: int = DEFAULT_MIN_VAR_QUAL,
                   minAF: float = DEFAULT_MIN_AF, logLevel = 0) =
   if logLevel >= 3:
     setLogFilter(lvlDebug)
@@ -311,8 +314,8 @@ proc callFromPlp*(plpFname: string, minVarQual: int = DEFAULT_MIN_VAR_QUAL,
 
   echo vcfHeader()
 
-  params.minVarQual = minVarQual
-  params.minAF = minAF
+  callParams.minVarQual = minVarQual
+  callParams.minAF = minAF
 
   var plpFh: File = if plpFname == "-": stdin else: open(plpFname)
   defer:
@@ -321,11 +324,11 @@ proc callFromPlp*(plpFname: string, minVarQual: int = DEFAULT_MIN_VAR_QUAL,
 
   for line in plpFh.lines:
     var plp = parsePlpJson(line)
-    for v in call(plp):
+    for v in callAtPos(plp):
       echo $v
   logger.log(lvlDebug, "Done. Goodbye")
 
 
 when isMainModule:
   import cligen
-  dispatch(call)
+  dispatch(callFromPlp)
