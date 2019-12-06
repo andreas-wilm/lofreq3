@@ -78,9 +78,9 @@ proc full_pileup*(bamFname: string, faFname = "", regions = "",
 proc call*(bamFname: string, faFname: string, regions: string,
            minVarQual: int = DEFAULT_MIN_VAR_QUAL,
            minAF: float = DEFAULT_MIN_AF,
-           minCov: int = DEFAULT_MIN_COV-1+1,# FIXME otherwise unknown symbol cligen bug?
-           maxCov: int = DEFAULT_MAX_COV-1+1,# FIXME otherwise unknown symbol cligen bug?
-           minBQ: int = DEFAULT_MIN_BQ-1+1,# FIXME otherwise unknown symbol cligen bug?
+           minCov: int = DEFAULT_MIN_COV,
+           maxCov: int = DEFAULT_MAX_COV,
+           minBQ: int = DEFAULT_MIN_BQ,
            noMQ: bool = not DEFAULT_USE_MQ,
            loglevel = 0, pileup = false, pretty = false) =
 

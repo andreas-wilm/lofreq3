@@ -6,10 +6,10 @@ import cligen
 # /
 
 # project specific
+# following imports need to be named otherwise cligen fails!?
 import lofreqpkg/call as lofreq_call
-# cannot be called 'call', otherwise you get an error from cligen:
-# "Error: formalParams requires a proc argument."
 import lofreqpkg/pileup/pileup as lofreq_pileup
+import lofreqpkg/pileup/algorithm# because const in pileup.call() exposed here are defined there
 
 
 when isMainModule:
