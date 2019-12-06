@@ -4,12 +4,14 @@ import json
 import unittest
 import strutils
 import osproc
+
 # project specific
-import ../src/lofreqpkg/pileup/pileup
+#import ../src/lofreqpkg/pileup/pileup
 import ../src/lofreqpkg/pileup/processor
-import ../src/lofreqpkg/pileup/postprocessing
+#import ../src/lofreqpkg/pileup/postprocessing
+
 # third party
-import hts
+#import hts
 
 
 suite "pileup tests":
@@ -37,4 +39,6 @@ suite "pileup tests":
       outp = "[" & outp.replace("\n", ",") & "]"
       outp = outp.replace(",]", "]")
       let actual = parseJson(outp)
+
+      # ignores order!
       check expected == actual

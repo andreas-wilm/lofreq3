@@ -50,6 +50,7 @@ proc vcfHeader*(src: string = "", refFa: string = ""): string =
 ##INFO=<ID=SB,Number=1,Type=Integer,Description="Phred-scaled strand bias at this position">
 ##INFO=<ID=DP,Number=1,Type=Integer,Description="Physical coverage">
 ##INFO=<ID=DP4,Number=4,Type=Integer,Description="Counts for ref-forward bases, ref-reverse, alt-forward and alt-reverse bases">
+##INFO=<ID=TYPE,Number=1,Type=String,Description="Variant type">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO"""
 
 # FIXME add TPE as INFO field

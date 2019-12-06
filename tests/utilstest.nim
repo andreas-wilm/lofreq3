@@ -1,5 +1,4 @@
 import unittest
-import math
 
 import ../src/lofreqpkg/utils
 

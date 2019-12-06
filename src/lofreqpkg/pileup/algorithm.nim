@@ -77,21 +77,21 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
   if consumes.query and consumes.reference:
     # mutual, process all matches
     processor.processMatches(readOffset, refOffset, event.len,
-                    read, reference, nextevent, minBQ)
+      read, reference, nextevent, minBQ)
     return (readOffset + event.len, refOffset + event.len)
 
   elif consumes.reference:# also true for 'N'
     # reference only, process deletion
     if event.op == CigarOp.deletion:
       processor.processDeletion(readOffset, refOffset, event.len,
-                       read, reference)
+        read, reference)
     return (readOffset, refOffset + event.len)
 
   elif consumes.query:# also true for 'S'
     # read only, process insertion
     if event.op == CigarOp.insert:
       processor.processInsertion(readOffset, refOffset, event.len,
-                        read, reference)
+        read, reference)
     return (readOffset + event.len, refOffset)
 
   else:
@@ -115,8 +115,8 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
   ## Performs a pileup over all reads provided by records
 
   var reference: ISequence# our own type, hence using loadSequence below
-  var storage = newSlidingDeque(records.chromosomeName, region, handler, 
-                                plpParams.mincov, plpParams.maxcov)
+  var storage = newSlidingDeque(records.chromosomeName, region, handler,
+    plpParams.mincov, plpParams.maxcov)
   var processor = newProcessor(storage, plpParams.useMQ)
 
   for read in records:

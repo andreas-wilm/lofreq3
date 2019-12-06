@@ -47,11 +47,12 @@ proc clean*[T](self: var QualityHistogram[T]): void =
     var eventCounts = 0
     for qual in qHist.keys():
       if qual == -1:# ignore everything filtered (marked as q=-1 in pileup)
-        self[event][qual] = 0# qHist is just a copy here?!
+        self[event][qual] = 0# qHist is just a copy here!
+        # in the future we can use this:self[event].del(qual)
       else:
         inc(eventCounts, self[event][qual])
     # delete zombie entries (those with only filtered events)
-    #if len(self[event]) == 0:
+    #if len(self[event]) == 0: once this is fixed in Nim we can remove eventCounts
     if eventCounts == 0:
       self.del(event)
 
@@ -82,7 +83,7 @@ proc `%`*[T](table: var QualityHistogram[T]): JsonNode {.inline.} =
 
 proc `%`*(table: CountTable[int]): JsonNode {.inline.} =
   result = newJObject()
-  
+
   var buff = initOrderedTable[string, JsonNode]()
   for pair in table.pairs:
     buff[$pair[0]] = %pair[1]
