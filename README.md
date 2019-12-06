@@ -28,14 +28,11 @@ datasets. Nucleic Acids Res. 2012;
   - [Citation](#citation)
   - [Table of contents](#table-of-contents)
   - [For the impatient](#for-the-impatient)
-  - [Usage](#usage)
-    - [Pileup](#pileup)
-    - [Call](#call)
   - [LoFreq explained](#lofreq-explained)
     - [The idea](#the-idea)
     - [Overview of the workflow](#overview-of-the-workflow)
     - [Preprocessing of your BAM file](#preprocessing-of-your-bam-file)
-    - [Pileup](#pileup-1)
+    - [Pileup](#pileup)
       - [Notes on Illumina's Read Segment Quality Control Indicator](#notes-on-illuminas-read-segment-quality-control-indicator)
     - [Variant Calling](#variant-calling)
     - [Postprocessing of variants](#postprocessing-of-variants)
@@ -47,21 +44,19 @@ datasets. Nucleic Acids Res. 2012;
 
 ## For the impatient
 
-**FIXME**
 
-## Usage
+LoFreq comes with one binary called `lofreq`. This binary supports sub-commands, currently `call` and `call_from_plp`. Run `lofreq help` or `lofreq cmd --help` to display usage information, parameters etc.
 
-LoFreq comes with one binary called `lofreq`. This binary supports sub-commands, currently `call` and `pileup`. Run `lofreq help` or `lofreq cmd --help` to display usage information, parameters etc.
+Use the following to call variants in BAM file `aln.bam` against reference `ref.fa` at chromosome `chr` between positions `s` to `e`:
 
-Variant calling is done in two stages: first you generate a pileup and that's input to the calling routines.
+    lofreq call -b aln.bam -f ref.fa -r chr:s-e
 
-### Pileup
 
-**FIXME**
+To create a pileup in JSON format (with merged qualities) run as above, but with added `-p`
 
-### Call
+    lofreq call -b aln.bam -f ref.fa -r chr:s-e -p
 
-**FIXME**
+
 
 ## LoFreq explained
 
@@ -89,9 +84,8 @@ A recommended preprocessing workflow looks as follows:
 3. Required for indel calling: Insertion of indel qualities with LoFreq2's `indelqual` (also done by GATK's BQSR).
 4. Recommended: Base quality recalibration with GATK's BQSR
 5. Recommended: Insertion of alignment qualities with LoFreq2's `alnqual`
-6. [Pileup with `lofreq pileup`](#pileup)
-7. [Variant calling with `lofreq call`](#calling)
-8. [Postprocessing](#postprocessing-of-variants)
+6. [Variant calling with `lofreq call`](#calling)
+7. [Postprocessing](#postprocessing-of-variants)
 
 ### Preprocessing of your BAM file
 
@@ -108,18 +102,19 @@ to LoFreq version 2.
 ### Pileup
 
 The pileup step extracts all information relevant for the variant calling process from your BAM file. It basically creates an quality histogram per position in the genome. The command to create a pileup is `lofreq
-pileup`. Run it with  `--help` to get usage information.
+call -p`. Run it with  `--help` to get usage information.
 
-All read-level filtering happens at
-this step. We advise against excessive filtering, because it can bias results. Keep in
+The pileup is a quality histogram per position in JSON format, which makes it directly usable by other programs. Please note that LoFreq applies quality merging (see below), so you will so only one quality per event.
+
+All read-level filtering happens at this step. We advise against excessive filtering, because it can bias results. Keep in
 mind that LoFreq was designed to model and deal with sequencing (and mapping) errors!
 
 The pileup also performs merging of qualities, e.g. mapping and base quality, an
 idea intrinsic to LoFreq version 2. The output file stores one quality per base.
 The idea for quality merging is as follows: all qualities stored in a BAM file
-are (or should in theory be) [Phred scaled](FIXME) error probabilties. For example, a base
-quality of 20 means, there is a 1% chance that this is in fact another base. To combine mapping `p_m`, alignment `p_a` and base qualities `p_bq` you can do
-the following:
+are (or should in theory be) [Phred scaled](https://en.wikipedia.org/wiki/Phred_quality_score) error probabilties.
+For example, a base quality of 20 means, there is a 1% chance that this is in fact another base.
+To combine mapping `p_m`, alignment `p_a` and base qualities `p_bq` you can do the following:
 
 `p_c = p_m + (1-p_m)*p_a + (1-p_m)*(1-p_a)*p_b`
 
@@ -130,7 +125,7 @@ aligned (`p_a`) and if it's neither mismapped nor misaligned
 
 #### Notes on Illumina's Read Segment Quality Control Indicator
 
-A base quality (BQ) of value 2 (ASCII: #) is used by Illumina as so called "Read Segment Quality
+A base quality (BQ) of value 2 (ASCII: `#`) is used by Illumina as so called "Read Segment Quality
 Control Indicator". Here, the quality of 2 is in fact not a quality or error
 probability, but just means that the sequencing machine wasn't sure about an
 entire segment in the read. This affects LoFreq, which treats qualities as error probabilties, and thus bases with low quality as
@@ -144,20 +139,22 @@ We discourage users from changing the default of `--minBQ 3`. LoFreq is build to
 
 ### Variant Calling
 
-This steps takes the pileup json file as input, calls variants and outputs a
+This step calls variants and outputs a
 VCF file. It is implemented in the `lofreq call` command. Default
-variant filtering and allele frequency filters are applied. See `lofreq call --help` for default values.
+variant quality filtering (`--minVarQual`) and allele frequency filters (`--minAF`) are applied.
+See `lofreq call --help` for default values.
 
 Strand bias (SB) is reported by not used for filtering by default. Note that strand bias doesn't mean that one strand has more bases then the other, but that the distribution of alt anf ref bases between forward and reverse strand is skewed. This is tested with Fisher's Exact test as also done in samtools.
 
 Unless your samples were highly PCR amplified, we suggest to filter on strand bias.
 
-- FIXME: bcftools command
-- FIXME: paper explaining strand bias it
 
 ### Postprocessing of variants
 
-**FIXME**: idea only
+
+- **FIXME**: bcftools command
+- **FIXME**: paper explaining strand bias it
+
 
 ## Installation
 
@@ -204,7 +201,7 @@ In order of importance:
   - CI on Github
   - Note: If nimble test is too limiting: https://github.com/ryanlayer/ssshtest
 - Implement filter or bcftools recipes (and add docs)
-- Parallelism: reader to queue with async calling (sidestepping json conversion)
+- Parallelism: reader queue with async calling (sidestepping json conversion)
 - Add workflow and container for end to end processing with old LoFreq. Consider adding BAQ and indel multiplexed before sorting
 - Create release with static binary and announce availability
 - Contain viterbi, indelqul and alnqual somehow as libs and link
