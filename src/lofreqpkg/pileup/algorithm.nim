@@ -55,7 +55,7 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
                   nextevent: CigarElement,
                   processor: var TProcessor,
                   read: Record, reference: TSequence,
-                  readOffset: int, refOffset: int, minBQ: int): (int, int) {.inline.} =
+                  readOffset: int, refOffset: int64, minBQ: int): (int, int64) {.inline.} =
   ## Processes one event (cigar element) on the read and returns the updated
   ## offset. The event is described by the first argument, 'event'.
   ## The parameter 'processor' provides a reference to the processor used to
@@ -120,7 +120,7 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
   var processor = newProcessor(storage, plpParams.useMQ)
 
   for read in records:
-      # all records come from the same chromosome as guarantted by RecordFilter
+      # all records come from the same chromosome as guaranteed by RecordFilter
       # load reference only after we're sure there's data to process
       if reference.len == 0:
         reference = fai.loadSequence(records.chromosomeName)
@@ -134,7 +134,7 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
 
       var
         readOffset = 0
-        refOffset = read.start
+        refOffset = int64(read.start)
 
       # tell the processor that the new read is about to start
       processor.beginRead(read.start)

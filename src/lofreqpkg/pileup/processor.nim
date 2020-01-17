@@ -148,14 +148,14 @@ proc newProcessor*[TStorage](storage: TStorage, useMQ: bool):
 
 
 proc processMatches*[TSequence](self: Processor,
-                   readStart: int, refStart: int, length: int,
+                   readStart: int, refStart: int64, length: int,
                    read: Record, reference: TSequence,
                    nextevent: CigarElement, minBQ: int) : void {.inline.} =
   ## Processes a matching substring between the read and the reference. All
   ## necessary information is available through the arguments. A matching
   ## substring consists of multiple contiguous matching bases.
   for offset in countUp(0, length - 1):
-    let refOff = refStart + offset
+    let refOff = int(refStart + offset)# FIXME stupid
     let readOff = readStart + offset
     let bq = int(read.baseQualityAt(readOff))
     if bq >= minBQ:
@@ -188,7 +188,7 @@ proc processMatches*[TSequence](self: Processor,
 
 
 proc processInsertion*[TSequence](self: Processor,
-                     readStart: int, refIndex: int, length: int,
+                     readStart: int, refIndex: int64, length: int,
                      read: Record, reference: TSequence): void {.inline.} =
   ## Processes an insertion on the read (wrt. the reference). All necessary
   ## information is available through the arguments. An insertion consists of
@@ -204,18 +204,18 @@ proc processInsertion*[TSequence](self: Processor,
 
 
 proc processDeletion*[TSequence](self: Processor,
-                    readIndex: int, refStart: int, length: int,
+                    readIndex: int, refStart: int64, length: int,
                     read: Record, reference: TSequence): void {.inline.} =
   ## Processes an deletion on the read (wrt. the reference). All necessary
   ## information is available through the arguments. A deletion consists of one
   ## or more bases found on the read, but not on the reference.
   var value = ""
   for offset in countUp(refStart, refStart + length - 1):
-    value &= reference.baseAt(offset)
+    value &= reference.baseAt(int(offset))# stupid conversion
     self.storage.recordMatch(offset, $DEFAULT_BLANK_SYMBOL,
                              DEFAULT_BLANK_QUALITY,
                              read.flag.reverse,
-                             reference.baseAt(offset))
+                             reference.baseAt(int(offset)))# FIXME stupid int conversion
 
   # deletion is reported on the base that preceeds it
   self.storage.recordDeletion(refStart - 1, value,
@@ -223,7 +223,7 @@ proc processDeletion*[TSequence](self: Processor,
                               read.flag.reverse)
 
 
-proc beginRead*(self: Processor, start: int): void {.inline.} =
+proc beginRead*(self: Processor, start: int64): void {.inline.} =
   ## Performs what is necessary before starting a new read. In this case,
   ## this means flushing the storage up to the starting position.
   discard self.storage.flushUpTo(start)

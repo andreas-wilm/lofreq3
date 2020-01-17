@@ -22,7 +22,7 @@ import operationData
 type PositionData* = ref object
     ## The 'PositionData' object keeping all information concerning one parti-
     ## cular position on the reference.
-    refIndex*: int
+    refIndex*: int64
     refBase*: char
     chromosome*: string
     matches*: OperationData[string]# char would do, but string to make it consistent
@@ -34,7 +34,7 @@ proc coverage*(pd: PositionData): Natural =
   coverage(pd.matches) + coverage(pd.deletions) + coverage(pd.insertions)
 
 
-proc newPositionData*(refIndex: int, refBase: char,
+proc newPositionData*(refIndex: int64, refBase: char,
                       chromosome: string) : PositionData {.inline.} =
   ## Constructs a new PositionData object keeping the data for
   ## the given position on the reference.

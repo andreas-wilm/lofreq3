@@ -21,7 +21,7 @@ type InfoField* = object
 
 type Variant* = ref object
   chrom*: string
-  pos*: int
+  pos*: int64
   id*: string
   refBase*: string
   alt*: string

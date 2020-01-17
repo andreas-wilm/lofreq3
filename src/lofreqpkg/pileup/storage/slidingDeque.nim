@@ -23,7 +23,7 @@ import ../../region
 ## Defines a type of the expected submit procedure. It should consume a
 ## 'PositionData' object without returning a result (since the storage should
 ## not be responsible for processing any data after it is collected.
-type DataToVoid* =  proc(data: PositionData): void 
+type DataToVoid* =  proc(data: PositionData): void
 
 ## Defines a type which can be wrapped into a submit procedure type
 ## 'DataToVoid' with a discard operation.
@@ -37,7 +37,7 @@ type SlidingDeque* = ref object
   deq: Deque[PositionData]
   submit: DataToVoid
   initialSize: int # estimated maximum size of the double ended queue
-  beginning: int
+  beginning: int64
   chromosome: string
   # Having the chromosome as a a field on the storage object is certainly less
   # than ideal. I will probably change this to be injected later.
@@ -101,7 +101,7 @@ proc submitDeq(self: SlidingDeque,
      self.submit(pd)
 
 
-proc resetDeq(self: SlidingDeque, beginning: int): void {.inline.} =
+proc resetDeq(self: SlidingDeque, beginning: int64): void {.inline.} =
   # Submits all elements from the current deque for furhter processing.
   self.submitDeq(self.deq)
   self.deq = initDeque[PositionData](self.initialSize)
@@ -115,7 +115,7 @@ proc `[]`(self: SlidingDeque, position:int): PositionData {.inline.} =
   return self.deq[position - self.beginning]
 
 
-proc sanityCheck(beginning, length, position: int) : void {.inline.} =
+proc sanityCheck(beginning: int64, length, position: int64) : void {.inline.} =
   ## Checks whether the given position is valid based on the
   ## current deque beginning and length. Assumes that the deque is allowed
   ## to be extended.
@@ -125,7 +125,7 @@ proc sanityCheck(beginning, length, position: int) : void {.inline.} =
     $position & $(beginning + length)
 
 
-proc sanityCheckNoExtend(beginning, length, position: int): void {.inline.} =
+proc sanityCheckNoExtend(beginning: int64, length, position: int64): void {.inline.} =
   ## Checks whether the given position is valid based on the
   ## current deque beginning and length. Assumes that the deque is not allowed
   ## to be extended.
@@ -134,7 +134,7 @@ proc sanityCheckNoExtend(beginning, length, position: int): void {.inline.} =
   assert position < beginning + length
 
 
-proc ensureStorage(self: SlidingDeque, position:int,
+proc ensureStorage(self: SlidingDeque, position: int64,
                    refBase: char): void {.inline.} =
   ## Performs sanity checks before and, if needed, extends the storage.
   let length = self.deq.len
@@ -146,7 +146,7 @@ proc ensureStorage(self: SlidingDeque, position:int,
                      self.chromosome))
 
 
-proc recordMatch*(self: SlidingDeque, position: int,
+proc recordMatch*(self: SlidingDeque, position: int64,
                   base: string, quality: int, reversed: bool,
                   refBase: char): void {.inline.} =
   ## Records match event information on for a given position.
@@ -154,7 +154,7 @@ proc recordMatch*(self: SlidingDeque, position: int,
   self.deq[position - self.beginning].addMatch(base, quality, reversed)
 
 
-proc recordDeletion*(self: SlidingDeque, position: int, bases: string,
+proc recordDeletion*(self: SlidingDeque, position: int64, bases: string,
                      quality: int, reversed: bool): void {.inline.} =
   ## Records deletion event information for a given position. If using this
   ## storage, all deletions should be reported on the base to their left. Thus,
@@ -164,7 +164,7 @@ proc recordDeletion*(self: SlidingDeque, position: int, bases: string,
   self.deq[position - self.beginning].addDeletion(bases, quality, reversed)
 
 
-proc recordInsertion*(self: SlidingDeque, position: int, bases: string,
+proc recordInsertion*(self: SlidingDeque, position: int64, bases: string,
                       quality: int, reversed: bool): void {.inline.} =
   ## Records insertion event infromation for a given position.
   sanityCheckNoExtend(self.beginning, self.deq.len, position)
@@ -179,8 +179,8 @@ proc flushAll*(self: SlidingDeque): int {.inline.} =
   self.resetDeq(0)
 
 
-proc flushUpTo*(self: SlidingDeque, position: int): int {.inline.} =
-  ## Submits all elements with positions on the reference smaller than the 
+proc flushUpTo*(self: SlidingDeque, position: int64): int {.inline.} =
+  ## Submits all elements with positions on the reference smaller than the
   ## given argument for further processing. Enables the queue to slide.
   ## The method returns the number of submitted elements.
   if position < self.beginning - 1:
