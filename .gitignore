@@ -6,3 +6,5 @@ tests/all
 tmp/
 *.swp
 lofreq.dSYM/
+tests/denv2-simulation/
+vcfeval

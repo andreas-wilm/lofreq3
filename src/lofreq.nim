@@ -1,6 +1,7 @@
 # standard
 import cligen
-#import nimprof
+when compileOption("profiler"):
+  import nimprof
 
 # third party
 # /

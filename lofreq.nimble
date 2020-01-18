@@ -10,7 +10,7 @@ requires "nim >= 1.0", "cligen >= 0.9.16", "hts >= 0.3.3", "tempfile >= 0.1.5"
 
 srcDir = "src"
 
-bin = @["lofreq"]
+bin = @["lofreq", "vcfeval"]
 
 skipDirs = @["tests"]
 skipExt = @["nim"]
