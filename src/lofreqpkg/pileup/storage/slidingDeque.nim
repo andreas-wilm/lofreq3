@@ -49,7 +49,7 @@ const DEFAULT_INITIAL_SIZE = 200# FIXME autoset from readlength?
 
 
 proc posWithinRegion(pos: PositionData, reg: Region): bool =
-  if pos.refIndex <= reg.s or pos.refIndex > reg.e:
+  if pos.refIndex < reg.s or pos.refIndex > reg.e:
     return false
   else:
     return true
@@ -98,7 +98,7 @@ proc submitDeq(self: SlidingDeque,
   for pd in deq:
     let cov = coverage(pd)
     if posWithinRegion(pd, self.region) and cov >= self.mincov and cov <= self.maxcov:# see also below
-     self.submit(pd)
+      self.submit(pd)
 
 
 proc resetDeq(self: SlidingDeque, beginning: int64): void {.inline.} =

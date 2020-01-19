@@ -28,21 +28,7 @@ import ../call
 var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
 
-proc auto_fill_region*(reg: Region, targets: seq[Target]): Region =
-  result = reg
-  var foundTarget = false
-  for t in targets:
-    if t.name == reg.sq:
-      result.s = 0
-      result.e = (int)t.length
-      foundTarget = true
-      break
-  if not foundTarget:
-    raise newException(ValueError, "Couldn't find " & reg.sq &
-                      " in BAM header. Valid entries are " & $targets)
-
-
-proc full_pileup*(bamFname: string, faFname = "", regions = "",
+proc fullPileup*(bamFname: string, faFname = "", regionsStr = "", bedFile = "",
                   handler: DataToVoid) : void =
   ## Performs the pileup over all chromosomes listed in the bam file.
   var bam: Bam
@@ -58,12 +44,17 @@ proc full_pileup*(bamFname: string, faFname = "", regions = "",
   else:
     logger.log(lvlInfo, "No reference file given")
 
-  for regstr in regions.split(','):
-    var reg = reg_from_str(reg_str)
+  if len(regionsStr)==0 and len(bedFile)==0:
+    quit("Need either region or bed argument")
+    # FIXME or autofill from BAM
 
-    if reg.s == 0 and reg.e == 0:# only sq given instead of full region
-      var targets = targets(bam.hdr)
-      reg = auto_fill_region(reg, targets)
+  for reg in getRegions(regionsStr, bedFile):
+    #regions.split(','):
+    #var reg = reg_from_str(reg_str)
+    #
+    #if reg.s == 0 and reg.e == 0:# only sq given instead of full region
+    #  var targets = targets(bam.hdr)
+    #  reg = auto_fill_region(reg, targets)
     logger.log(lvlInfo, "Starting pileup for " & $reg)
 
     var records = newRecordFilter(bam, reg.sq, reg.s, reg.e)
@@ -75,7 +66,7 @@ proc full_pileup*(bamFname: string, faFname = "", regions = "",
 
 
 ## "main" function. actually a pileup function with different postprocessing options
-proc call*(bamFname: string, faFname: string, regions: string,
+proc call*(bamFname: string, faFname: string, regions = "", bedFname = "",
            minVarQual: int = DEFAULT_MIN_VAR_QUAL,
            minAF: float = DEFAULT_MIN_AF,
            minCov: int = DEFAULT_MIN_COV,
@@ -115,7 +106,7 @@ proc call*(bamFname: string, faFname: string, regions: string,
   plpParams.maxCov = maxCov
   plpParams.minBQ = minBQ
   plpParams.useMQ = not noMQ
-  full_pileup(bamFname, faFname, regions, p)
+  full_pileup(bamFname, faFname, regions, bedFname, p)
 
 
 when isMainModule:
