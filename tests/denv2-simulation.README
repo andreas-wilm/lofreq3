@@ -1,5 +1,4 @@
-wget https://sourceforge.net/projects/lofreq/files/test-data/denv2-simulation.tgz/download -O
-denv2-simulation.tgz
+wget https://sourceforge.net/projects/lofreq/files/test-data/denv2-simulation.tgz/download -O denv2-simulation.tgz
 tar xvzf denv2-simulation.tgz
 samtools index denv2-simulation/denv2-10haplo.bam
 bgzip denv2-simulation/denv2-10haplo_true-snp.vcf

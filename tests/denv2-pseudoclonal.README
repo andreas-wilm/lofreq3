@@ -1,0 +1,11 @@
+wget https://sourceforge.net/projects/lofreq/files/test-data/denv2-pseudoclonal.tgz/download -O denv2-pseudoclonal.tgz
+tar xvzf denv2-pseudoclonal.tgz
+samtools index denv2-pseudoclonal/denv2-pseudoclonal.bam
+snpin=denv2-pseudoclonal/denv2-pseudoclonal_true-snp.snp
+vcfout=denv2-pseudoclonal/denv2-pseudoclonal_true-snp.vcf
+echo "##fileformat=VCFv4.0" > $vcfout
+echo -e "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO" >> $vcfout
+awk '/^[^#]/ {printf "%s\t%d\t.\t%s\t%s\t.\tPASS\t.\n", $1, $2, substr($3, 1, 1), substr($3, 3, 1)}' $snpin >> $vcfout
+bgzip $vcfout
+tabix ${vcfout}.gz
+samtools faidx denv2-pseudoclonal/denv2-pseudoclonal_cons.fa
