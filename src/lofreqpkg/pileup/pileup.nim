@@ -33,8 +33,8 @@ proc fullPileup*(bamFname: string, faFname = "", regionsStr = "", bedFile = "",
   ## Performs the pileup over all chromosomes listed in the bam file.
   var bam: Bam
   var fai: Fai
-
-  if not open(bam, bamFname, index=true):
+  let numHTSReaderThreads = 1# see no improvement with 2 threads. likely all time spend on processing rather than unpacking
+  if not open(bam, bamFname, index=true, threads=numHTSReaderThreads):
     quit("Could not open BAM file " & bamFname)
 
   if len(faFname)!=0:
