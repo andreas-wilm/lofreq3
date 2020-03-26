@@ -1,66 +1,47 @@
-import strformat
+## LoFreq: variant calling routines
+##
+## - Author: Andreas Wilm <wilma@gis.a-star.edu.sg>
+## - License: The MIT License
 
 {.compile: "viterbi.c".}
 {.passL: "-lm"}
 
-proc viterbi_test() {.cdecl, importc: "viterbi_test".}
+# standard
+import strformat
+import tables
+
+# third party
+import hts
+
+# project specific
+
+
 # void
-proc left_align_indels(sref: cstring, squery: cstring, slen: cint, new_state_seq: cstring) {.cdecl, importc: "left_align_indels".}
+proc left_align_indels*(sref: cstring, squery: cstring, slen: cint, new_state_seq: cstring) {.cdecl, importc: "left_align_indels".}
+
+
 # returns shift
 #proc viterbi*(sref: cstring, squery: cstring, bqual: cstring, saln: cstring, def_qual: cint): int {.cdecl, importc: "viterbi".}
-proc viterbi(sref: cstring, squery: cstring, bqual: ptr uint8, saln: cstring, def_qual: cint): int {.cdecl, importc: "viterbi".}
+proc viterbi_c*(sref: cstring, squery: cstring, bqual: ptr uint8, saln: cstring, def_qual: cint): int {.cdecl, importc: "viterbi".}
 
-block:
-  echo "Testing left-alignment of indels"
-  var sref = "CCATATGG"
-  var squery = "CCAT**GG"
-  var slen = cint(max(len(sref), len(squery)))
-  var new_state_seq = newString(slen)# not newStringOfCap
-  left_align_indels(sref, squery, slen, new_state_seq)
-  assert new_state_seq == "MMDDMMMM"
 
-  sref = "CCAT**GG"
-  squery = "CCATATGG"
-  slen = cint(max(len(sref), len(squery)))
-  new_state_seq = newString(slen)# not newStringOfCap
-  left_align_indels(sref, squery, 8, new_state_seq);
-  assert new_state_seq == "MMIIMMMM"
+proc viterbi*(faFname: string, bamIn: string, bamOut: string) =
+  var fai: Fai
+  # keeping all observerd reference sequences in memory for speedup
+  var refs = initTable[string, string]()
+  var bam: Bam
 
-  sref =  "CCATATGG*CC"
-  squery = "CCAT**GGGCC"
-  slen = cint(max(len(sref), len(squery)))
-  new_state_seq = newString(slen)# not newStringOfCap
-  left_align_indels(sref, squery, slen, new_state_seq);
-  assert new_state_seq == "MMDDMMIMMMM"
+  if not open(fai, faFname):
+    quit("Could not open reference sequence file: " & faFname)
 
-#block:
-#  echo "Testing viterbi realignment"
-#  var def_qual: cint = 20
-#  var sref = "CCATATGG"
-#  var squery = "CCATGG"
-#  var bqual = "??????"# = 30
-#  var alnseq = newString(max(len(sref), len(squery)))
-#  var shift = viterbi(sref, squery, bqual, alnseq, def_qual)
-#  assert alnseq == "MMDDMMMM"
+  open(bam, bamIn, fai=faFname)
+  for rec in bam:
+    var chrom = rec.chrom
+    if not refs.hasKey(chrom):
+      echo "DEBUG: Loading " & chrom
+      refs[chrom] = fai.get(chrom)
 
-block:
-  echo "Testing viterbi realignment"
-  # htsnim quals are offset already and seq[uint8].
-  # the original viterbi expects char*.
-  # found `cast [uint8_t](addr(bqs[0]))`
-  # at https://forum.nim-lang.org/t/4647.
-  # this is certainly faster then coding and decoding, but
-  # required changes in c code, looks non-intuitive and depends on Nim's
-  # internal seq representation.
-  var def_qual: cint = 20
-  var sref = "CCATATGG"
-  var squery = "CCATGG"
-  var bqual: seq[uint8]
-  for i in 0..<len(squery):
-    bqual.add(30)
-  var alnseq = newString(max(len(sref), len(squery)))
-  var shift = viterbi(sref, squery, cast[ptr uint8](addr(bqual[0])), alnseq, def_qual)
-  assert alnseq == "MMDDMMMM"
+
 
 
 #from lofreq_viterbi.c v2.1.4
@@ -104,3 +85,8 @@ block:
 #    # FIXME are there more?
 #
 #write updated read
+
+
+when isMainModule:
+  import cligen
+  dispatch(viterbi)
