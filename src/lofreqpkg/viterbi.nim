@@ -25,7 +25,7 @@ proc left_align_indels*(sref: cstring, squery: cstring, slen: cint, new_state_se
 proc viterbi_c*(sref: cstring, squery: cstring, bqual: ptr uint8, saln: cstring, def_qual: cint): int {.cdecl, importc: "viterbi".}
 
 
-proc viterbi*(faFname: string, bamIn: string, bamOut: string) =
+proc viterbi*(faFname: string, bamIn: string, bamOut: string, skipSecondary = true) =
   var fai: Fai
   # keeping all observerd reference sequences in memory for speedup
   var refs = initTable[string, string]()
@@ -37,34 +37,85 @@ proc viterbi*(faFname: string, bamIn: string, bamOut: string) =
   open(bam, bamIn, fai=faFname)
   for rec in bam:
     var chrom = rec.chrom
+
+    if rec.flag.secondary and skipSecondary:
+      echo "DEBUG: secondary: write immediately or put in q"
+      continue
+
+    if rec.flag.unmapped:
+      echo "DEBUG: unmapped: write immediately or put in q"
+      continue
+
+    var hasIndels = false
+    for c in rec.cigar:
+      if c.op in @[CigarOp.insert, CigarOp.deletion]:
+        hasIndels = true
+        break
+    if not hasIndels:
+      echo "DEBUG: noIndels write immediately or put in q"
+      continue
+
+    echo "DEBUG: shorten this mess by removing trailing soft clip and ignoring hard clips/padding"
+    # make sure no internal soft, hard clip or padding
+    # use slices to get bq and sq
+    # keep start() and stop() positions as is
+    # test on real data which has clips back
+    # and move to func
+    #type CigarOp* {.pure.} = enum match = 0'u32, insert, deletion, ref_skip, soft_clip, hard_clip, pad, equal, diff, back
+
+    # remove soft clipped bases
+    var queryOrig: string
+    discard rec.sequence(queryOrig)
+    var query = ""
+    var bqualOrig: seq[uint8]
+    discard rec.base_qualities(bqualOrig)
+    var bqual: seq[uint8]
+
+    var x = rec.start# coordinate on reference
+    var y = 0;# coordinate on query
+
+    # parse cigar string
+    for c in rec.cigar:
+      # or c.consumes.query and reference: https://stackoverflow.com/questions/39710796/infer-the-length-of-a-sequence-using-the-cigar
+      if c.op in @[CigarOp.match, CigarOp.equal, CigarOp.diff]:
+        # FIXME translated from C. Can be shortened by slicing
+        for j in 0..<c.len:
+          query.add(queryOrig[y])
+          bqual.add(bqualOrig[y])
+          inc x
+          inc y
+      elif c.op == CigarOp.hard_clip:
+        # in theory we should do nothing here but hard clipping info gets lost here FIXME
+        echo "DEBUG: cannot handle hard clips yet"
+        # FIXME write anyway FIXME next
+      elif c.op == CigarOp.deletion:
+        x += c.len
+      elif c.op ==  CigarOp.insert:
+        # FIXME translated from C. Can be shortened by slicing
+        for j in 0..<c.len:
+          query.add(queryOrig[y])
+          bqual.add(bqualOrig[y])
+          inc y
+      elif c.op == CigarOp.soft_clip:
+        y += c.len
+      else:
+        echo "DEBUG: unknown cigar op in read " & rec.qname
+        # FIXME write anyway FIXME next
+
+    echo "DEBUG: x=" & $x
+    echo "DEBUG: y=" & $y
+    echo "DEBUG: queryOrig=" & queryOrig
+    echo "DEBUG: query=" & query
+    echo "DEBUG: cigar=" & $rec.cigar
+
     if not refs.hasKey(chrom):
       echo "DEBUG: Loading " & chrom
       refs[chrom] = fai.get(chrom)
 
-
-
-
+  # if new cigar != old cigar
+  echo "WARNING: mapper generated scores will be invalid / off (NM, MC, MD, AS and even MQ) for realigned reads"
+# ../lofreq.git/src/lofreq/lofreq_viterbi.c
 #from lofreq_viterbi.c v2.1.4
-#
-#static int del_flag = 1;
-#static int q2default = -1;
-#static int reclip = 0;
-#fetch_func(b, &tmp, del_flag, q2default, reclip);
-#
-#if read.unmapped:
-#  write read
-#  next
-#
-#if no indels in cigar:
-#  write read
-#  next
-#
-#if ref not loaded:
-#  read reference and keep in mem for later
-#extract reference with RWIN from read matchpos - RWIN to read endpos + RWIN
-#
-#FIXME what about hardclips?
-#FIXME ignore secondary alignments?
 #
 #determine read-refstartpos ignoring clips
 #determine read-refendpos ignoring clips
