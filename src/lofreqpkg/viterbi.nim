@@ -8,13 +8,14 @@
 
 # standard
 import strformat
+import strutils
 import tables
 
 # third party
 import hts
 
 # project specific
-
+#/
 
 # void
 proc left_align_indels*(sref: cstring, squery: cstring, slen: cint, new_state_seq: cstring) {.cdecl, importc: "left_align_indels".}
@@ -38,14 +39,17 @@ proc viterbi*(faFname: string, bamIn: string, bamOut: string, skipSecondary = tr
   for rec in bam:
     var chrom = rec.chrom
 
+    # skip secondary reads unless requested
     if rec.flag.secondary and skipSecondary:
       echo "DEBUG: secondary: write immediately or put in q"
       continue
 
+    # skip unmapped reads
     if rec.flag.unmapped:
       echo "DEBUG: unmapped: write immediately or put in q"
       continue
 
+    # skip reads without indels
     var hasIndels = false
     for c in rec.cigar:
       if c.op in @[CigarOp.insert, CigarOp.deletion]:
@@ -55,7 +59,22 @@ proc viterbi*(faFname: string, bamIn: string, bamOut: string, skipSecondary = tr
       echo "DEBUG: noIndels write immediately or put in q"
       continue
 
-    echo "DEBUG: shorten this mess by removing trailing soft clip and ignoring hard clips/padding"
+    # load reference if not cached
+    if not refs.hasKey(chrom):
+      echo "DEBUG: Loading " & chrom
+      refs[chrom] = fai.get(chrom)
+
+    # get reference context for aligned read
+    let refPadding = 10
+    var s = rec.start - refPadding
+    if s < 0:
+      s = 0
+    var e = rec.stop + refPadding
+    if e >= len(refs[chrom]):
+      e = len(refs[chrom])
+    var refContext = toUpperAscii(refs[chrom][s..e])#toupper to avoid ref masking
+    echo "refContext=" & refContext
+
     # make sure no internal soft, hard clip or padding
     # use slices to get bq and sq
     # keep start() and stop() positions as is
@@ -63,55 +82,58 @@ proc viterbi*(faFname: string, bamIn: string, bamOut: string, skipSecondary = tr
     # and move to func
     #type CigarOp* {.pure.} = enum match = 0'u32, insert, deletion, ref_skip, soft_clip, hard_clip, pad, equal, diff, back
 
-    # remove soft clipped bases
-    var queryOrig: string
-    discard rec.sequence(queryOrig)
-    var query = ""
-    var bqualOrig: seq[uint8]
-    discard rec.base_qualities(bqualOrig)
+    # find leading and trailing skip ops
+    var leadingSkipOps, trailingSkipOps: seq[CigarElement]
+    let skipOps = @[CigarOp.soft_clip, CigarOp.hard_clip, CigarOp.pad]
+    for i in countup(0, len(rec.cigar)-1):
+      var c = rec.cigar[i]
+      if c.op notin skipOps:
+        break
+      leadingSkipOps.add(c)
+    for i in countdown(len(rec.cigar)-1, len(leadingSkipOps)+1):
+      var c = rec.cigar[i]
+      if c.op notin skipOps:
+        break
+      trailingSkipOps.add(c)
+    echo "DEBUG cigar=" & $rec.cigar & " leadingSkipOps=" & $leadingSkipOps & " trailingSkipOps=" & $trailingSkipOps
+
+    # FIXME is first or last non skip pos is I/D warn, print and continue
+
+    var leadingSoftClipLen = 0
+    for c in leadingSkipOps:
+      if c.op == CigarOp.soft_clip:
+        leadingSoftClipLen.inc(c.len)
+    var trailingSoftClipLen = 0
+    for c in trailingSkipOps:
+      # starting from lower index, but order doesn't matter here, since it's all skips
+      if c.op == CigarOp.soft_clip:
+        trailingSoftClipLen.inc(c.len)
+    echo "DEBUG leadingSoftClipLen=" & $leadingSoftClipLen & " trailingSoftClipLen=" & $trailingSoftClipLen
+
+    var query: string
+    discard rec.sequence(query)
+    var queryWOSoftClip = ""
+    queryWOSoftClip = query[leadingSoftClipLen .. len(query)-1-trailingSoftClipLen]
+
     var bqual: seq[uint8]
+    discard rec.base_qualities(bqual)
+    var bqualWOSoftCLip: seq[uint8]
+    bqualWOSoftCLip = bqual[leadingSoftClipLen .. len(bqual)-1-trailingSoftClipLen]
 
-    var x = rec.start# coordinate on reference
-    var y = 0;# coordinate on query
+    echo "DEBUG: origQuery=" & query
+    echo "DEBUG: queryWOSoftClip=" & queryWOSoftClip# & " bqualWOSoftCLip=" & $bqualWOSoftCLip
 
-    # parse cigar string
-    for c in rec.cigar:
-      # or c.consumes.query and reference: https://stackoverflow.com/questions/39710796/infer-the-length-of-a-sequence-using-the-cigar
-      if c.op in @[CigarOp.match, CigarOp.equal, CigarOp.diff]:
-        # FIXME translated from C. Can be shortened by slicing
-        for j in 0..<c.len:
-          query.add(queryOrig[y])
-          bqual.add(bqualOrig[y])
-          inc x
-          inc y
-      elif c.op == CigarOp.hard_clip:
-        # in theory we should do nothing here but hard clipping info gets lost here FIXME
-        echo "DEBUG: cannot handle hard clips yet"
-        # FIXME write anyway FIXME next
-      elif c.op == CigarOp.deletion:
-        x += c.len
-      elif c.op ==  CigarOp.insert:
-        # FIXME translated from C. Can be shortened by slicing
-        for j in 0..<c.len:
-          query.add(queryOrig[y])
-          bqual.add(bqualOrig[y])
-          inc y
-      elif c.op == CigarOp.soft_clip:
-        y += c.len
-      else:
-        echo "DEBUG: unknown cigar op in read " & rec.qname
-        # FIXME write anyway FIXME next
+    let q2def: cint = 2
+    echo "WARN: fixed q2def=" & $q2def
+    echo "WARN: implement median for testing."
+    var newCigarRaw = newString(max(len(queryWOSoftClip), len(refContext)))
 
-    echo "DEBUG: x=" & $x
-    echo "DEBUG: y=" & $y
-    echo "DEBUG: queryOrig=" & queryOrig
-    echo "DEBUG: query=" & query
-    echo "DEBUG: cigar=" & $rec.cigar
+    var shift = viterbi_c(refContext, queryWOSoftClip, cast[ptr uint8](addr(bqualWOSoftCLip[0])), newCigarRaw, q2def)
+    echo "DEBUG newCigarRaw=" & $newCigarRaw
 
-    if not refs.hasKey(chrom):
-      echo "DEBUG: Loading " & chrom
-      refs[chrom] = fai.get(chrom)
 
+    echo "NotImplemented"
+    # reconstruct cigar: take care of padding, hardclip and softclip
   # if new cigar != old cigar
   echo "WARNING: mapper generated scores will be invalid / off (NM, MC, MD, AS and even MQ) for realigned reads"
 # ../lofreq.git/src/lofreq/lofreq_viterbi.c
