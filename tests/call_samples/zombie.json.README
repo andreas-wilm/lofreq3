@@ -1,0 +1,2 @@
+Contains events with only filtered counts (-1) that should be removed before calling
+LoFreq shouldn't fail or call anything

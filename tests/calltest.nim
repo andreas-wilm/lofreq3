@@ -13,12 +13,33 @@ import hts/vcf
 
 # FIXME how to test main function in call (private and nameclash)?
 
+let lofreq = "../lofreq"
 
 suite "call":
 
+
+  # issue 14: fails to remove zombie tests before calling
+  test "remove zombie entries from plp before calling":
+    # make sure call works and  nothing is predicted
+    var tmpfd: File
+    var tmpname: string
+    (tmpfd, tmpname) = mkstemp()
+    tmpfd.close
+    let cmd = lofreq & " call_from_plp -p call_samples/zombie.json > " & tmpname
+    #echo "Testing: " & cmd
+    let outp = execProcess(cmd)
+    var v:VCF
+    discard open(v, tmpname)
+    var nvars = 0
+    for rec in v:
+        inc nvars
+        
+    check nvars == 0
+
+
+
   # simple test, mainly an excuse to test htsnim vcf
   test "simple-vars":
-    let lofreq = "../lofreq"
     var tmpfd: File
     var tmpname: string
     (tmpfd, tmpname) = mkstemp()
@@ -52,7 +73,6 @@ suite "call":
     check nvars == 10
 
   test "direct call vs call from plp":
-    let lofreq = "../lofreq"
     var
       tmpfd1: File
       tmpfd2: File
