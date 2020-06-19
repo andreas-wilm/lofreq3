@@ -15,13 +15,15 @@ import lofreqpkg/viterbi as lofreq_viterbi
 
 when isMainModule:
   dispatch_multi(
-    [viterbi,
-      help = {"faFname": "fasta reference (indexed)",
-              "bamIn": "BAM input (\"-\" for stdin)",
-              "bamOut": "BAM output (\"-\" for stdout)"},
-      short = {"faFname": 'f',
-               "bamIn": 'i',
-               "bamOut": 'o'}],
+    [
+# disabled on master until complete
+#viterbi,
+#      help = {"faFname": "fasta reference (indexed)",
+#              "bamIn": "BAM input (\"-\" for stdin)",
+#              "bamOut": "BAM output (\"-\" for stdout)"},
+#      short = {"faFname": 'f',
+#               "bamIn": 'i',
+#               "bamOut": 'o'}],
     [call_from_plp,
       help = {"plpFname": "pileup file name (LoFreq JSON format)",
               "minVarQual": "minimum variant quality",
