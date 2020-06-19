@@ -191,6 +191,10 @@ cligen@0.9.37, hts@0.2.19, tempfile@0.1.7
 
 In order of importance:
 
+- Viterbi
+  - complete implementation
+  - add tests
+  - compare against old lofreq
 - Testing, testing, testing
   - Test merged qualities against old lofreq
   - Full test against spike in data
