@@ -223,7 +223,7 @@ proc callAtPos*(plp: PositionData): seq[Variant] =
   var baseCountsStranded: CountTable[string]
 
   for vartype in low(VarType)..high(VarType):
-    # FIXME there got ot be an easier way to do this
+    # FIXME there got to be an easier way to do this
     if vartype == snp:
       plp.matches.clean()
       (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.matches, snp)

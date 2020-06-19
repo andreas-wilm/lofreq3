@@ -12,7 +12,7 @@
 
 import tables
 import json
-
+import sequtils
 
 ## Defines a 'QualityHistogram' type with a type parameter specifying the type
 ## of the event value.
@@ -36,10 +36,11 @@ proc coverage*[T](table: QualityHistogram[T]): Natural =
 
 proc clean*[T](self: var QualityHistogram[T]): void =
   ## removes filtered entries, i.e those with q<0 that are kept
-  ## for debugging in pileup but not to be removed before calling
-
-  for event in self.keys():# can't use pairs because we need qHist to be writable
-    var qHist = self[event]
+  ## for debugging in pileup but need to be removed before calling
+  
+  let events = toSeq(self.keys())
+  for ev in events:# can't use pairs() because we need qHist to be writable
+    var qHist = self[ev]
     # del not supported for CountTable but setting to 0 should have the same effect:
     # https://stackoverflow.com/questions/59160984/remove-key-from-counttable-in-nim
     # still need to track zombie entries with eventCounts, because len() doesn't change
@@ -47,14 +48,12 @@ proc clean*[T](self: var QualityHistogram[T]): void =
     var eventCounts = 0
     for qual in qHist.keys():
       if qual == -1:# ignore everything filtered (marked as q=-1 in pileup)
-        self[event][qual] = 0# qHist is just a copy here!
-        # in the future we can use this:self[event].del(qual)
+          self[ev].del(qual)
       else:
-        inc(eventCounts, self[event][qual])
-    # delete zombie entries (those with only filtered events)
-    #if len(self[event]) == 0: once this is fixed in Nim we can remove eventCounts
+        inc(eventCounts, self[ev][qual])
+    # Now delete zombie entries, i.e those with only filtered events
     if eventCounts == 0:
-      self.del(event)
+      self.del(ev)
 
 
 proc set*[T](self: var QualityHistogram[T], value: T,

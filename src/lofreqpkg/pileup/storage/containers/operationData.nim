@@ -33,7 +33,7 @@ proc initOperationData*[T](): OperationData[T] {.inline.} =
 
 proc clean*[T](self: var OperationData[T]): void =
   ## removes filtered entries, i.e those with q<0 that are kept
-  ## for debugging in pileup but not to be removed before calling
+  ## for debugging in pileup but need to be removed before calling
   self.histogram.clean()
 
 
