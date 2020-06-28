@@ -1,11 +1,33 @@
 # standard library
 import unittest
+import tempfile
 # third party
 # /
 # project specific
 import  ../src/lofreqpkg/viterbi
 
+let lofreq = "../lofreq"
+
 suite "viterbi tests":
+  test "pseudomonas"
+    var tmpfd: File
+    var tmpname: string
+    (tmpfd, tmpname) = mkstemp()
+    tmpfd.close
+    let cmd = lofreq & " viterbi -f REF -i BAM -o > " & tmpname
+    #echo "Testing: " & cmd
+    let outp = execProcess(cmd)
+    # FIXME output should be all 75M
+    # and tags should look like lofreq
+    #var v:VCF
+    #discard open(v, tmpname)
+    #var nvars = 0
+    #for rec in v:
+    #    inc nvars
+    #
+    #check nvars == 0
+
+
   test "Testing left-alignment of indels":
     var sref = "CCATATGG"
     var squery = "CCAT**GG"

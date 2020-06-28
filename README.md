@@ -191,6 +191,7 @@ cligen@0.9.37, hts@0.2.19, tempfile@0.1.7
 
 In order of importance:
 
+- Write snakefile for end to end pipeline using old and new LoFreq and replace components as we move along
 - Viterbi
   - complete implementation
   - add tests
