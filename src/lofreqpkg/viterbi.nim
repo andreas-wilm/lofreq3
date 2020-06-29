@@ -11,6 +11,7 @@ import strformat
 import strutils
 import tables
 import sequtils
+import algorithm
 
 # third party
 import hts
@@ -19,12 +20,13 @@ import hts
 #/
 
 # void
-proc left_align_indels*(sref: cstring, squery: cstring, slen: cint, new_state_seq: cstring) {.cdecl, importc: "left_align_indels".}
+proc left_align_indels(sref: cstring, squery: cstring, slen: cint,
+  new_state_seq: cstring) {.cdecl, importc: "left_align_indels".}
 
 
 # returns shift
-#proc viterbi*(sref: cstring, squery: cstring, bqual: cstring, saln: cstring, def_qual: cint): int {.cdecl, importc: "viterbi".}
-proc viterbi_c*(sref: cstring, squery: cstring, bqual: ptr uint8, saln: cstring, def_qual: cint): int {.cdecl, importc: "viterbi".}
+proc viterbi_c(sref: cstring, squery: cstring, bqual: ptr uint8,
+  saln: cstring, def_qual: cint): int {.cdecl, importc: "viterbi".}
 
 
 proc skipRead(rec: Record, skipSecondary: bool): bool =
@@ -50,7 +52,6 @@ proc skipRead(rec: Record, skipSecondary: bool): bool =
 
 
 # get reference context for aligned read
-# FIXME add tests
 proc getRefContext(rec: Record, refSq: string, refPadding: int): string =
   var s = rec.start - refPadding
   if s < 0:
@@ -61,32 +62,50 @@ proc getRefContext(rec: Record, refSq: string, refPadding: int): string =
   result = toUpperAscii(refSq[s..e])#toupper to avoid ref masking
 
 
-proc encCigarChar(op: char): uint32 =
-  let idx = "MIDNSHP=XB".find(op)
-  doAssert idx >= 0
-  result = uint32(idx)
+# from https://github.com/brentp/bamject/blob/master/src/cigar.nim
+
+const BAM_CIGAR_SHIFT = 4'u32
+const BAM_CIGAR_STR = "MIDNSHP=XB"
+
+var cigar_tab : array[128, int]
+for i in 0..<128:
+    cigar_tab[i] = -1
+for i, c in BAM_CIGAR_STR:
+    cigar_tab[c.int] = i
 
 
-proc foldCigar(rawCigar: string): seq[CigarElement] =
-  # translation of LoFreq2 function
-  var endIdx = len(rawCigar)-1# this is only needed because the rawCigar is overallocated and len doesn't work!?
-  for i, opChar in rawCigar.pairs:
-    if not opChar.isUpperAscii:
-      endIdx = i-1
-      break
-    doAssert opChar in "MID"# viterbi should not have produced anything else
+proc tocigar(cs:string): seq[CigarElement] =
+  if cs.len > 4:
+    result = newSeqOfCap[CigarElement](2)
+  var off = 0
+  while off < cs.len:
+    var i = 0
+    while cs[off + i].isdigit:
+      i += 1
+    var num = parseInt(cs[off..<off+i])
+    var ops = cs[off+i]
+    off += i + 1
+    var el:uint32 = num.uint32 shl BAM_CIGAR_SHIFT
+    if cigar_tab[ops.int] == -1:
+      quit "unknown cigar op from " & cs & ": " & $ops
+    el = el or cigar_tab[ops.int].uint32
+    result.add(cast[CigarElement](el))
 
-  var curr_op = encCigarChar(rawCigar[0])
-  var curr_oplen = 1
-  for op_char in rawCigar[1..endIdx]:
-    let this_op = encCigarChar(rawCigar[0])
-    if this_op != curr_op:
-      result.add(CigarElement(uint32(curr_oplen shl 4) or curr_op))
-      curr_op = this_op
-      curr_oplen = 1
+# end from
+
+# fold unrolled cigarstring, e.g. MMMMDD to 4M2D
+proc foldCigar(unfoldedCigar: string): string =
+  var lastop = unfoldedCigar[0]
+  var oplen = 1
+  for i in countup(1, len(unfoldedCigar)-1):
+    let op = unfoldedCigar[i]
+    if op == lastop:
+      oplen += 1
     else:
-      curr_oplen += 1
-  result.add(CigarElement(uint32(curr_oplen shl 4) or curr_op))
+      result.add($oplen & lastop)
+      oplen = 1
+      lastop = op
+  result.add($oplen & lastop)
 
 
 proc createRealnRec(rec: Record, realnStart: int64, fullRealnCigar: Cigar): string =
@@ -107,9 +126,9 @@ proc createRealnRec(rec: Record, realnStart: int64, fullRealnCigar: Cigar): stri
         delIndices.add(i)
     for i, j in delIndices.pairs:
       recSplit.delete(j-i)
-
     result = recSplit.join("\t")
-    
+
+
 proc findSkipOps(rec: Record): (seq[CigarElement], int, seq[CigarElement], int) = 
     # find leading and trailing skip ops
     var leadingSkipOps, trailingSkipOps: seq[CigarElement]
@@ -124,7 +143,7 @@ proc findSkipOps(rec: Record): (seq[CigarElement], int, seq[CigarElement], int) 
       if c.op notin skipOps:
         break
       trailingSkipOps.add(c)
-    #echo "DEBUG cigar=" & $rec.cigar & " leadingSkipOps=" & $leadingSkipOps & " trailingSkipOps=" & $trailingSkipOps
+    #stderr.writeLine("DEBUG cigar=" & $rec.cigar & " leadingSkipOps=" & $leadingSkipOps & " trailingSkipOps=" & $trailingSkipOps)
 
     # FIXME is first or last non skip pos is I/D warn, print and continue
 
@@ -137,10 +156,33 @@ proc findSkipOps(rec: Record): (seq[CigarElement], int, seq[CigarElement], int) 
       # starting from lower index, but order doesn't matter here, since it's all skips
       if c.op == CigarOp.soft_clip:
         trailingSoftClipLen.inc(c.len)
-    #echo "DEBUG leadingSoftClipLen=" & $leadingSoftClipLen & " trailingSoftClipLen=" & $trailingSoftClipLen
+    #stderr.writeLine("DEBUG leadingSoftClipLen=" & $leadingSoftClipLen & " trailingSoftClipLen=" & $trailingSoftClipLen)
 
     return (leadingSkipOps, leadingSoftClipLen, 
       trailingSkipOps, trailingSoftClipLen)
+
+
+proc median(xs: seq[uint8]): uint8 =
+  if len(xs) == 1: return xs[0]
+  var ys = xs
+  sort(ys, system.cmp[uint8])
+  if len(ys) mod 2 == 0:
+    # even number: return mean of the two elements in the middle
+    result = (ys[len(ys) div 2] + ys[len(ys) div 2 - 1]) div 2;
+  else:
+    # odd number: return element in middle
+     result = ys[len(ys) div 2];
+
+
+proc medianQual(quals: seq[uint8]): uint8 =
+  var nonQ2quals: seq[uint8]
+  for q in quals:
+    if q != 2:
+      nonQ2quals.add(q)
+  if len(nonQ2quals) == 0:
+    return 0
+  else:
+    return median(nonQ2quals)
 
 
 proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadding = 10) =
@@ -170,10 +212,10 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
 
     # load reference if not cached
     if not refs.hasKey(chrom):
-      #echo "DEBUG: Loading " & chrom
+      #stderr.writeLine("DEBUG Loading " & chrom)
       refs[chrom] = fai.get(chrom)
 
-    stderr.writeLine("DEBUG incoming read = " & $rec.tostring())
+    #stderr.writeLine("DEBUG incoming read = " & $rec.tostring())
 
     let refContext = getRefContext(rec, refs[chrom], refPadding)
 
@@ -191,24 +233,36 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
     #echo "DEBUG: origQuery=" & query
     #echo "DEBUG: queryWOSoftClip=" & queryWOSoftClip# & " bqualWOSoftCLip=" & $bqualWOSoftCLip
 
-    let q2def: cint = 2
-    stderr.writeLine("WARN: fixed q2def=" & $q2def)
-    stderr.writeLine("WARN: implement median for testing.")
-    let realnCigarRaw = newString(max(len(queryWOSoftClip), len(refContext)))
+    let q2def = cint(medianQual(bqualWOSoftCLip))
+    # don't realign Q2 only
+    if q2def == 0:
+      echo $rec.tostring()
+      continue
+
+    let realnCigarRawOveralloc = newString(max(len(queryWOSoftClip), len(refContext)))
     # WARNING with newStringOfCap we get a segfault, but now newCigarRaw is oversized
     # printing works, but len is incorrect. creating a copy to a second string with $ doesn't help
     # FIXME what to do with shift?
     let shift = viterbi_c(refContext, queryWOSoftClip,
-      cast[ptr uint8](addr(bqualWOSoftCLip[0])), realnCigarRaw, q2def)
-    #echo "DEBUG realnCigarRaw ='" & $realnCigarRaw & "'"
+      cast[ptr uint8](addr(bqualWOSoftCLip[0])), realnCigarRawOveralloc, q2def)
+    #stderr.writeLine("DEBUG realnCigarRawOveralloc ='" & $realnCigarRawOveralloc & "'")
 
-    let realnCigar = foldCigar(realnCigarRaw)
-    #echo "DEBUG realnCigar=" & $realnCigarRaw
+    # realnCigarRaw is overallocated and len doesn't work!?
+    # so let's fix this now
+    var endIdx = len(realnCigarRawOveralloc)-1# this is only needed because the rawCigar is overallocated and len doesn't work!?
+    for i, opChar in realnCigarRawOveralloc.pairs:
+      if not opChar.isUpperAscii:
+        endIdx = i-1
+        break
+    var realnCigarRaw = realnCigarRawOveralloc[0..endIdx]
+
+    let realnCigar = toCigar(foldCigar(realnCigarRaw))
+    #stderr.writeLine("DEBUG realnCigar=" & $realnCigarRaw)
     var fullRealnCigarSeq = concat(leadingSkipOps, realnCigar, trailingSkipOps)
     # https://github.com/brentp/hts-nim/commit/0bf2683b17f5ccc27a7af4731f187452b287cb61
     GC_ref(fullRealnCigarSeq)
     let fullRealnCigar = newCigar(fullRealnCigarSeq)
-    #echo "DEBUG fullRealnCigar=" & $fullRealnCigar
+    #stderr.writeLine("DEBUG fullRealnCigar=" & $fullRealnCigar)
 
     # check if start pos was shifted
     var realnStart = rec.start
@@ -217,9 +271,9 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
       lower = 0
     if shift - (rec.start - lower) != 0:
       realnStart = rec.start + (shift - (rec.start - lower))
-      stderr.writeLine("DEBUG: new realnStart = " & $realnStart & " lower=" & $lower & " shift=" & $shift)
-    else:
-      stderr.writeLine("DEBUG: new=old realnStart = " & $realnStart)
+      #stderr.writeLine("DEBUG: new realnStart = " & $realnStart & " lower=" & $lower & " shift=" & $shift)
+    #else:
+      #stderr.writeLine("DEBUG: new=old realnStart = " & $realnStart)
       
     echo createRealnRec(rec, realnStart, fullRealnCigar)
 
@@ -227,12 +281,64 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
 
     GC_unref(fullRealnCigarSeq)
 
-
-stderr.writeLine("FIXME test case: shift of read")
-stderr.writeLine("FIXME test case: skip and skipS at both sides")
-stderr.writeLine("WARN wrongly changed offset in ./lofreq viterbi -f tests/viterbi/NC_011770_head.fa -i tests/viterbi/pseudomonas_pair_screwed_up_cigar.bam")
+  stderr.writeLine("WARNING: MC tag in realigned mates invalid")
 
 
 when isMainModule:
-  import cligen
-  dispatch(viterbi)
+  block:
+    var quals: seq[uint8]
+    quals = @[2u8, 2u8, 2u8, 2u8]
+    doAssert medianQual(quals) == 0
+    quals = @[2u8, 10u8, 20u8, 40u8]
+    doAssert medianQual(quals) == 20
+    quals = @[2u8, 10u8, 20u8, 40u8, 100u8]
+    doAssert medianQual(quals) == 30
+
+  block:  
+    doAssert foldcigar("MDDDM") == "1M3D1M"
+    doAssert foldcigar("MMMMIDMMMM") == "4M1I1D4M"
+
+  block:
+    let sref = "CCATATGG"
+    let squery = "CCAT**GG"
+    let slen = cint(max(len(sref), len(squery)))
+    let new_state_seq = newString(slen)# not newStringOfCap
+    left_align_indels(sref, squery, slen, new_state_seq)
+    doAssert new_state_seq == "MMDDMMMM"
+
+  block:
+    let sref = "CCAT**GG"
+    let squery = "CCATATGG"
+    let slen = cint(max(len(sref), len(squery)))
+    let new_state_seq = newString(slen)# not newStringOfCap
+    left_align_indels(sref, squery, 8, new_state_seq);
+    doAssert new_state_seq == "MMIIMMMM"
+
+  block:
+    var sref = "CCATATGG*CC"
+    let squery = "CCAT**GGGCC"
+    let slen = cint(max(len(sref), len(squery)))
+    let new_state_seq = newString(slen)# not newStringOfCap
+    left_align_indels(sref, squery, slen, new_state_seq);
+    doAssert new_state_seq == "MMDDMMIMMMM"
+
+  block:
+    # htsnim quals are offset already and seq[uint8].
+    # the original viterbi expects char*.
+    # found `cast [uint8_t](addr(bqs[0]))`
+    # at https://forum.nim-lang.org/t/4647.
+    # this is certainly faster then coding and decoding, but
+    # required changes in c code, looks non-intuitive and depends on Nim's
+    # internal seq representation.
+    let def_qual: cint = 20
+    let sref = "CCATATGG"
+    let squery = "CCATGG"
+    var bqual: seq[uint8]
+    for i in 0..<len(squery):
+      bqual.add(30)
+    var alnseq = newString(max(len(sref), len(squery)))
+    let shift = viterbi_c(sref, squery, cast[ptr uint8](addr(bqual[0])), alnseq, def_qual)
+    doAssert shift == 0
+    doAssert alnseq == "MMDDMMMM"
+
+    echo "OK: all tests passed"

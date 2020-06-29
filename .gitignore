@@ -9,3 +9,4 @@ lofreq.dSYM/
 tests/denv2-simulation/
 vcfeval
 tests/denv2-pseudoclonal/
+src/lofreqpkg/viterbi
