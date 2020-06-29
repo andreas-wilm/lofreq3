@@ -1,6 +1,6 @@
 ## LoFreq: variant calling routines
 ##
-## - Author: Andreas Wilm <wilma@gis.a-star.edu.sg>
+## - Author: Andreas Wilm <andreas.wilm@gmail.com>
 ## - License: The MIT License
 
 {.compile: "viterbi.c".}
@@ -17,7 +17,9 @@ import algorithm
 import hts
 
 # project specific
-#/
+import utils
+
+
 
 # void
 proc left_align_indels(sref: cstring, squery: cstring, slen: cint,
@@ -281,11 +283,11 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
 
     GC_unref(fullRealnCigarSeq)
 
-  stderr.writeLine("WARNING: MC tag in realigned mates invalid")
+  stderr.writeLine("WARNING: MC tag in realigned mates will be invalid")
 
 
 when isMainModule:
-  block:
+  testblock "medianQual":
     var quals: seq[uint8]
     quals = @[2u8, 2u8, 2u8, 2u8]
     doAssert medianQual(quals) == 0
@@ -294,11 +296,11 @@ when isMainModule:
     quals = @[2u8, 10u8, 20u8, 40u8, 100u8]
     doAssert medianQual(quals) == 30
 
-  block:  
+  testblock "foldcigar":
     doAssert foldcigar("MDDDM") == "1M3D1M"
     doAssert foldcigar("MMMMIDMMMM") == "4M1I1D4M"
 
-  block:
+  testblock "left_align_indels 1":
     let sref = "CCATATGG"
     let squery = "CCAT**GG"
     let slen = cint(max(len(sref), len(squery)))
@@ -306,7 +308,7 @@ when isMainModule:
     left_align_indels(sref, squery, slen, new_state_seq)
     doAssert new_state_seq == "MMDDMMMM"
 
-  block:
+  testblock "left_align_indels 2":
     let sref = "CCAT**GG"
     let squery = "CCATATGG"
     let slen = cint(max(len(sref), len(squery)))
@@ -314,7 +316,7 @@ when isMainModule:
     left_align_indels(sref, squery, 8, new_state_seq);
     doAssert new_state_seq == "MMIIMMMM"
 
-  block:
+  testblock "left_align_indels 3":
     var sref = "CCATATGG*CC"
     let squery = "CCAT**GGGCC"
     let slen = cint(max(len(sref), len(squery)))
@@ -322,7 +324,7 @@ when isMainModule:
     left_align_indels(sref, squery, slen, new_state_seq);
     doAssert new_state_seq == "MMDDMMIMMMM"
 
-  block:
+  testblock "viterbi_c":
     # htsnim quals are offset already and seq[uint8].
     # the original viterbi expects char*.
     # found `cast [uint8_t](addr(bqs[0]))`
@@ -341,4 +343,4 @@ when isMainModule:
     doAssert shift == 0
     doAssert alnseq == "MMDDMMMM"
 
-    echo "OK: all tests passed"
+  echo "OK: all tests passed"

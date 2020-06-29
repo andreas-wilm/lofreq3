@@ -109,6 +109,3 @@ proc call*(bamFname: string, faFname: string, regions = "", bedFname = "",
   full_pileup(bamFname, faFname, regions, bedFname, p)
 
 
-when isMainModule:
-  import cligen
-  dispatch(pileup)
