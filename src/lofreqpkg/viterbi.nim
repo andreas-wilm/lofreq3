@@ -7,28 +7,25 @@
 {.passL: "-lm"}
 
 # standard
-import strformat
 import strutils
 import tables
 import sequtils
 import algorithm
-
 # third party
 import hts
-
 # project specific
 import utils
-
-
-
-# void
-proc left_align_indels(sref: cstring, squery: cstring, slen: cint,
-  new_state_seq: cstring) {.cdecl, importc: "left_align_indels".}
 
 
 # returns shift
 proc viterbi_c(sref: cstring, squery: cstring, bqual: ptr uint8,
   saln: cstring, def_qual: cint): int {.cdecl, importc: "viterbi".}
+
+
+proc countIndels(cigar: Cigar): int =
+  for c in cigar:
+    if c.op in @[CigarOp.insert, CigarOp.deletion]:
+        inc(result, len(c))
 
 
 proc skipRead(rec: Record, skipSecondary: bool): bool =
@@ -42,23 +39,18 @@ proc skipRead(rec: Record, skipSecondary: bool): bool =
     return true
 
   # skip reads without indels
-  var hasIndels = false
-  for c in rec.cigar:
-    if c.op in @[CigarOp.insert, CigarOp.deletion]:
-      hasIndels = true
-      break
-  if not hasIndels:
+  if countIndels(rec.cigar) == 0:
     return true
 
   return false
 
 
 # get reference context for aligned read
-proc getRefContext(rec: Record, refSq: string, refPadding: int): string =
+proc getRefContext(rec: Record, refSq: string, refPadding: int, numIndels: int): string =
   var s = rec.start - refPadding
   if s < 0:
     s = 0
-  var e = rec.stop + refPadding
+  var e = rec.stop + refPadding + numIndels
   if e >= len(refSq):
     e = len(refSq)
   result = toUpperAscii(refSq[s..e])#toupper to avoid ref masking
@@ -219,7 +211,7 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
 
     #stderr.writeLine("DEBUG incoming read = " & $rec.tostring())
 
-    let refContext = getRefContext(rec, refs[chrom], refPadding)
+    let refContext = getRefContext(rec, refs[chrom], refPadding, countIndels(rec.cigar))
 
     let (leadingSkipOps, leadingSoftClipLen, 
       trailingSkipOps, trailingSoftClipLen) = findSkipOps(rec)
@@ -241,10 +233,14 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
       echo $rec.tostring()
       continue
 
-    let realnCigarRawOveralloc = newString(max(len(queryWOSoftClip), len(refContext)))
+    # let realnCigarRawOveralloc = newString(max(len(queryWOSoftClip), len(refContext)))
+    # the above is not enough. there pathological cases (like EAS20_8_6_75_302_4 in Ecoli spike-in.waq.bam)
+    # where this leads to weirdly clipped viterbi results
+    let realnCigarRawOveralloc = newString(2*len(query))
     # WARNING with newStringOfCap we get a segfault, but now newCigarRaw is oversized
     # printing works, but len is incorrect. creating a copy to a second string with $ doesn't help
     # FIXME what to do with shift?
+    
     let shift = viterbi_c(refContext, queryWOSoftClip,
       cast[ptr uint8](addr(bqualWOSoftCLip[0])), realnCigarRawOveralloc, q2def)
     #stderr.writeLine("DEBUG realnCigarRawOveralloc ='" & $realnCigarRawOveralloc & "'")
@@ -266,6 +262,25 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
     let fullRealnCigar = newCigar(fullRealnCigarSeq)
     #stderr.writeLine("DEBUG fullRealnCigar=" & $fullRealnCigar)
 
+    when not defined(release):
+      var nconsumed = 0
+      for ce in fullRealnCigar:
+        if query(consumes(ce)):
+          inc(nconsumed, len(ce))
+      assert nconsumed == len(query)
+      # if nconsumed != len(query):
+      #   stderr.writeLine("DEBUG nconsumed " & $nconsumed & " != len(query) " & $len(query))
+      #   stderr.writeLine("DEBUG incoming rec=" & rec.tostring)
+      #   stderr.writeLine("DEBUG incoming refContext=" & refContext)
+      #   stderr.writeLine("DEBUG leadingSkipOps=" & $leadingSkipOps)
+      #   stderr.writeLine("DEBUG trailingSkipOps=" & $trailingSkipOps)
+      #   stderr.writeLine("DEBUG realnCigarRawOveralloc=" & $realnCigarRawOveralloc)
+      #   stderr.writeLine("DEBUG realnCigarRaw=" & $realnCigarRaw)
+      #   stderr.writeLine("DEBUG realnCigar=" & $realnCigar)
+      #   stderr.writeLine("DEBUG fullRealnCigar=" & $fullRealnCigar)
+      #   stderr.writeLine("DEBUG q2def=" & $q2def)
+      #   assert false
+
     # check if start pos was shifted
     var realnStart = rec.start
     var lower = rec.start - refPadding;
@@ -276,7 +291,7 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
       #stderr.writeLine("DEBUG: new realnStart = " & $realnStart & " lower=" & $lower & " shift=" & $shift)
     #else:
       #stderr.writeLine("DEBUG: new=old realnStart = " & $realnStart)
-      
+    
     echo createRealnRec(rec, realnStart, fullRealnCigar)
 
     #oBam.close()
@@ -300,29 +315,6 @@ when isMainModule:
     doAssert foldcigar("MDDDM") == "1M3D1M"
     doAssert foldcigar("MMMMIDMMMM") == "4M1I1D4M"
 
-  testblock "left_align_indels 1":
-    let sref = "CCATATGG"
-    let squery = "CCAT**GG"
-    let slen = cint(max(len(sref), len(squery)))
-    let new_state_seq = newString(slen)# not newStringOfCap
-    left_align_indels(sref, squery, slen, new_state_seq)
-    doAssert new_state_seq == "MMDDMMMM"
-
-  testblock "left_align_indels 2":
-    let sref = "CCAT**GG"
-    let squery = "CCATATGG"
-    let slen = cint(max(len(sref), len(squery)))
-    let new_state_seq = newString(slen)# not newStringOfCap
-    left_align_indels(sref, squery, 8, new_state_seq);
-    doAssert new_state_seq == "MMIIMMMM"
-
-  testblock "left_align_indels 3":
-    var sref = "CCATATGG*CC"
-    let squery = "CCAT**GGGCC"
-    let slen = cint(max(len(sref), len(squery)))
-    let new_state_seq = newString(slen)# not newStringOfCap
-    left_align_indels(sref, squery, slen, new_state_seq);
-    doAssert new_state_seq == "MMDDMMIMMMM"
 
   testblock "viterbi_c":
     # htsnim quals are offset already and seq[uint8].
