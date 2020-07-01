@@ -11,8 +11,10 @@ import strutils
 import tables
 import sequtils
 import algorithm
+
 # third party
 import hts
+
 # project specific
 import utils
 
@@ -30,12 +32,11 @@ proc countIndels(cigar: Cigar): int =
 
 proc skipRead(rec: Record, skipSecondary: bool): bool =
 
-  # skip secondary reads unless requested
-  if rec.flag.secondary and skipSecondary:
+  if rec.flag.qcfail or rec.flag.dup or rec.flag.unmapped:
     return true
 
-  # skip unmapped reads
-  if rec.flag.unmapped:
+  # skip secondary reads unless requested
+  if rec.flag.secondary and skipSecondary:
     return true
 
   # skip reads without indels
@@ -181,7 +182,7 @@ proc medianQual(quals: seq[uint8]): uint8 =
 
 proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadding = 10) =
   var fai: Fai
-  # keeping all observerd reference sequences in memory for speedup
+  # keeping all observed reference sequences in memory for speedup
   var refs = initTable[string, string]()
   var iBam: Bam
   #var oBam: Bam
@@ -293,6 +294,7 @@ proc viterbi*(faFname: string, bamInFname: string, skipSecondary = true, refPadd
       #stderr.writeLine("DEBUG: new=old realnStart = " & $realnStart)
     
     echo createRealnRec(rec, realnStart, fullRealnCigar)
+    #oBam.write(createRealnRec(rec, realnStart, fullRealnCigar))
 
     #oBam.close()
 

@@ -12,9 +12,18 @@ import lofreqpkg/call as lofreq_call
 import lofreqpkg/pileup/pileup as lofreq_pileup
 import lofreqpkg/pileup/algorithm# because const in pileup.call() exposed here are defined there
 import lofreqpkg/viterbi as lofreq_viterbi
+import lofreqpkg/indelqual as lofreq_indelqual
 
 when isMainModule:
   dispatch_multi(
+   [indelqual,
+      help = {"faFname": "fasta reference (indexed)",
+              "bamInFname": "BAM input (\"-\" for stdin)",
+              "uniform": "Instead of Dindel (default), add his indel quality uniformly (format: indel or ins,del)"},
+      short = {"faFname": 'f',
+               "bamInFname": 'i',
+               "uniform": 'u',
+               }],
     [viterbi,
       help = {"faFname": "fasta reference (indexed)",
               "bamInFname": "BAM input (\"-\" for stdin)",
