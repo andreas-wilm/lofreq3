@@ -43,3 +43,8 @@ proc dateStr*(): string =
   var t = getTime().local()
   result = t.format("yyyyMMdd")
 
+# poor man's testing
+template testblock*(message: string, body: untyped) =
+  block:
+    echo "Testing " & message
+    body
