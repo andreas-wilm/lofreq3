@@ -26,8 +26,30 @@ proc skipRead(rec: Record): bool =
   return false
 
 
+iterator groupBy(query: string): (int, char) =
+  doAssert len(query) != 0
+  var runLength = 1 
+  var runChar = query[0]
+  for c in query[1 .. ^1]:
+    if c == runChar:
+      inc runLength
+    else:
+      yield (runLength, runChar)
+      runLength = 1 
+      runChar = c
+  yield (runLength, runChar)
+
+
+proc findHomopolymerRuns(query: string): seq[int] =
+  for (l, c) in groupBy(query):
+    result.add(l)
+    for i in countup(1, l-1):
+      result.add(1)
+      
+
 proc parseIndelArg(uniform: string): (char, char) =
   # FIXME parse
+  # FIXME test >=0
   # FIXME encode
   doAssert false
 
@@ -64,7 +86,7 @@ proc indelqual*(faFname: string, bamInFname: string, uniform: string = "") =
   var fai: Fai
   # keeping all observed reference homopolymers in memory
   # this should only be needed if file isn't sorted. FIXME warn?
-  var homopolymers = initTable[string, string]()
+  var homopolymersPerChrom = initTable[string, seq[int]]()
   var iBam: Bam
   #var oBam: Bam
   var bi = ""
@@ -95,12 +117,11 @@ proc indelqual*(faFname: string, bamInFname: string, uniform: string = "") =
 
     # for dindel: load reference is needed, compute homopolymers and set bi and bd 
     if len(uniform) == 0:
-      if not homopolymers.hasKey(chrom):
-        #stderr.writeLine("DEBUG Loading " & chrom)
+      if not homopolymersPerChrom.hasKey(chrom):
         let refsq = fai.get(chrom)
-        stderr.writeLine("FIXME find homopolymers")
+        homopolymersPerChrom[chrom] = findHomopolymerRuns(refsq)
         stderr.writeLine("FIXME get dindel indelq (bi == bd)")
-    # for uniform: bi and bd already set
+    # for uniform bi and bd are already set
 
     echo createRec(rec, bi, bd)
     #obam.write(createRec(rec, bi, bd))
@@ -109,7 +130,8 @@ proc indelqual*(faFname: string, bamInFname: string, uniform: string = "") =
 
 
 when isMainModule:
-  #testblock "name":
-    #doAssert true
+  testblock "findHomopolymerRuns":
+    let x = findHomopolymerRuns("AACCCTTTTA")
+    doAssert x == @[2, 1, 3, 1, 1, 4, 1, 1, 1, 1]
     
   echo "OK: all tests passed"
