@@ -72,7 +72,7 @@ proc mergeQuals*(q_m: int, q_a: int, q_b: int): int =
 proc insQualityAt(r: Record, i: int):  Natural =
   let iq = tag[cstring](r, INS_QUAL_TAG)
   if iq.isSome:
-    return decodeASCIIQual(iq.get[i])
+    return decodeQual(iq.get[i])
   else:
     return high(int)
 
@@ -80,7 +80,7 @@ proc insQualityAt(r: Record, i: int):  Natural =
 proc delQualityAt(r: Record, i: int): Natural =
     let dq = tag[cstring](r, DEL_QUAL_TAG)
     if dq.isSome:
-      return decodeASCIIQual(dq.get[i])
+      return decodeQual(dq.get[i])
     else:
       return high(int)
 
@@ -88,7 +88,7 @@ proc delQualityAt(r: Record, i: int): Natural =
 proc baseAlnQualityAt(r: Record, i: int): Natural =
   let baq = tag[cstring](r, BASE_ALN_QUAL_TAG)
   if baq.isSome:
-    return decodeASCIIQual(baq.get[i])
+    return decodeQual(baq.get[i])
   else:
     return high(int)
 
@@ -96,7 +96,7 @@ proc baseAlnQualityAt(r: Record, i: int): Natural =
 proc insAlnQualityAt(r: Record, i: int): Natural =
   let iaq = tag[cstring](r, INS_ALN_QUAL_TAG)
   if iaq.isSome:
-    return decodeASCIIQual(iaq.get[i])
+    return decodeQual(iaq.get[i])
   else:
     return high(int)
 
@@ -104,7 +104,7 @@ proc insAlnQualityAt(r: Record, i: int): Natural =
 proc delAlnQualityAt(r: Record, i: int): Natural =
   let daq = tag[cstring](r, DEL_ALN_QUAL_TAG)
   if daq.isSome:
-    return decodeASCIIQual(daq.get[i])
+    return decodeQual(daq.get[i])
   else:
     return high(int)
 

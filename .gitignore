@@ -10,3 +10,5 @@ tests/denv2-simulation/
 vcfeval
 tests/denv2-pseudoclonal/
 src/lofreqpkg/viterbi
+tests/denv2-pseudoclonal
+tests/denv2-simulation
