@@ -66,13 +66,13 @@ proc createRec(rec: Record, bi: string, bd: string): string =
     var delIndices: seq[int]
     for i in countup(11, len(recSplit)-1):
       let fieldSplit = recSplit[i].split(":")
-      if fieldSplit[0] in @["BI", "BD"]:
+      if fieldSplit[0] in @[BI_TAG, BD_TAG]:
         delIndices.add(i)
     for i, j in delIndices.pairs:
       recSplit.delete(j-i)
 
-    recSplit.add("BI:Z:" & bi)
-    recSplit.add("BD:Z:" & bd)
+    recSplit.add(BI_TAG & ":Z:" & bi)
+    recSplit.add(BD_TAG & ":Z:" & bd)
 
     result = recSplit.join("\t")
 

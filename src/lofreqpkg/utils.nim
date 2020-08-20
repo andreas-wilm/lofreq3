@@ -13,6 +13,9 @@ const REF_SYMBOL_AT_INDEL_RV* = '_'
 const DEFAULT_BLANK_SYMBOL* = '*'# missing base symbol
 
 
+template *notImplementedError = doAssert(false, "Not implemented")
+
+
 proc refSymbolAtIndel*(reverse: bool): char =# evil hack to support strand for "non-indels"
   if reverse:
     REF_SYMBOL_AT_INDEL_RV
