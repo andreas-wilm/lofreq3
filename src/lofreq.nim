@@ -13,9 +13,16 @@ import lofreqpkg/pileup/pileup as lofreq_pileup
 import lofreqpkg/pileup/algorithm# because const in pileup.call() exposed here are defined there
 import lofreqpkg/viterbi as lofreq_viterbi
 import lofreqpkg/indelqual as lofreq_indelqual
+import lofreqpkg/alnqual as lofreq_alnqual
 
 when isMainModule:
   dispatch_multi(
+    [alnqual,
+      help = {"faFname": "fasta reference (indexed)",
+              "bamInFname": "BAM input (\"-\" for stdin)"},
+      short = {"faFname": 'f',
+               "bamInFname": 'i',
+               }],
    [indelqual,
       help = {"faFname": "fasta reference (indexed)",
               "bamInFname": "BAM input (\"-\" for stdin)",
