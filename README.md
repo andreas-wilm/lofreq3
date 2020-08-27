@@ -41,6 +41,11 @@ datasets. Nucleic Acids Res. 2012;
     - [Using a container](#using-a-container)
     - [Compilation from source](#compilation-from-source)
 - [To Do List](#to-do-list)
+  - [Testing](#testing)
+  - [Documentation:](#documentation)
+  - [Performance](#performance)
+  - [Features](#features)
+  - [Release](#release)
 
 ## For the impatient
 
@@ -172,7 +177,9 @@ Run `nimble build` to build the binary (see `./lofreq`)
 
 Run `nimble test` to run tests (some of which depend on the successful build).
 
-To execute the compiled library, you will need the [htslib
+More extensive and longer running tests can be found in the shell files in the `./tests/` directory. 
+
+To execute the compiled binary, you will need the [htslib
 library](https://github.com/samtools/htslib) installed and in your
 LD_LIBRARY_PATH as well.
 
@@ -189,34 +196,35 @@ cligen@0.9.37, hts@0.2.19, tempfile@0.1.7
 
 # To Do List
 
-In order of importance:
 
-- Write snakefile for end to end pipeline using old and new LoFreq and replace components as we move along
-- Viterbi
-  - complete implementation
-  - add tests
-  - compare against old lofreq
-- Testing, testing, testing
-  - Test merged qualities against old lofreq
-  - Full test against spike in data
-  - Against samtools pileup
-  - mincov and maxcov filter (coverage() function) in the presence of indels
-  - Coverage in vcf
-  - SB output in vcf
-  - CI on Github
-  - Note: If nimble test is too limiting: https://github.com/ryanlayer/ssshtest
-- Implement filter or bcftools recipes (and add docs)
+## Testing
+
+- Write snakefile for end to end testing of each step and comparison to old LoFreq (run both)
+- Test merged qualities against old lofreq
+- Full test against spike in data
+- mincov and maxcov filter (coverage() function) in the presence of indels
+- Coverage in vcf
+- SB output in vcf
+- Add CI on Github
+- Implement filter or doc bcftools recipes (and add docs)
+- Note: If nimble test is too limiting: https://github.com/ryanlayer/ssshtest
+
+## Documentation:
+
+- Add FAQ
+
+## Performance
+
+- Rewrite pileup
 - Parallelism: reader queue with async calling (sidestepping json conversion)
-- Add workflow and container for end to end processing with old LoFreq. Consider adding BAQ and indel multiplexed before sorting
+- even the release compiled version is a few times slower then the old version (write version that
+  skips that parsing just for benchmark purposes?)
+- Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode
+
+
+## Features
+
+- Reimplement indel qual. Challenge is to remove htslib dep and compute BAQ at the same time
+
+## Release
 - Create release with static binary and announce availability
-- Contain viterbi, indelqul and alnqual somehow as libs and link
-- Extend documentation:
-  - Note on invalid CIGAR ops
-  - Explain how it works in detail
-  - Why we force region and how to generate it
-  - FAQ
-  - Split usage from explanation and add section for the impatient
-- Performance
-  - even the release compiled version is a few times slower then the old version (write version that
-    skips that parsing just for benchmark purposes?)
-  - Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode

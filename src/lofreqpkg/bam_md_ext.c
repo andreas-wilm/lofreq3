@@ -29,14 +29,94 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
 #include <float.h>
+#include <stdint.h>
 
+/* Some constants imported from htslib to remove external dependency */
+
+/*
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
 #include "htslib/kstring.h"
+*/
+
+#define BAM_CMATCH      0
+#define BAM_CINS        1
+#define BAM_CDEL        2
+#define BAM_CREF_SKIP   3
+#define BAM_CSOFT_CLIP  4
+#define BAM_CHARD_CLIP  5
+#define BAM_CPAD        6
+#define BAM_CEQUAL      7
+#define BAM_CDIFF       8
+#define BAM_CBACK       9
+
+#define BAM_FUNMAP         4
+
+/*! @abstract Table for converting a nucleotide character to the 4-bit encoding. */
+extern const unsigned char seq_nt16_table[256];
+
+/*! @abstract Table for converting a 4-bit encoded nucleotide to a letter. */
+extern const char seq_nt16_str[];
+
+const unsigned char seq_nt16_table[256] = {
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+     1, 2, 4, 8, 15,15,15,15, 15,15,15,15, 15, 0 /*=*/,15,15,
+    15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+    15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+    15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
+    15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
+    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15
+};
+
+const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
+
+const int seq_nt16_int[] = { 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 };
+
+#define bam_seqi(s, i) ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf)
+/* FIXME remove following three once replaced */
+#define bam_get_seq(b)   ((b)->data + ((b)->core.n_cigar<<2) + (b)->core.l_qname)
+#define bam_get_qual(b)  ((b)->data + ((b)->core.n_cigar<<2) + (b)->core.l_qname + (((b)->core.l_qseq + 1)>>1))
+#define bam_get_cigar(b) ((uint32_t*)((b)->data + (b)->core.l_qname))
+
+/* htslib END */
+
+/* FIXME remove the following after replacing */
+typedef struct {
+    int32_t tid;
+    int32_t pos;
+    uint32_t bin:16, qual:8, l_qname:8;
+    uint32_t flag:16, n_cigar:16;
+    int32_t l_qseq;
+    int32_t mtid;
+    int32_t mpos;
+    int32_t isize;
+} bam1_core_t;
+
+typedef struct {
+    bam1_core_t core;
+    int l_data, m_data;
+    uint8_t *data;
+#ifndef BAM_NO_ID
+    uint64_t id;
+#endif
+} bam1_t;
+
+
 
 #include "kprobaln_ext.h"
 //#include "samutils.h"
@@ -57,7 +137,7 @@ static int pacbio_msg_printed = 0;
 
 
 
-void idaq(bam1_t *b, const char *ref, double **pd, int xe, int xb, int bw);
+void idaq(const bam1_t *b, const char *ref, double **pd, int xe, int xb, int bw);
 
 #define set_u(u, b, i, k) { int x=(i)-(b); x=x>0?x:0; (u)=((k)-x+1)*3; }
 #define prob_to_sangerq(p) (p < 0.0 + DBL_EPSILON ? 126+1 : ((int)(-10 * log10(p))+33))
@@ -78,7 +158,7 @@ int u_within_limits(int u, int bw) {
      }
 }     
 
-void idaq(bam1_t *b, const char *ref, double **pd, int xe, int xb, int bw)
+void idaq(const bam1_t *b, const char *ref, double **pd, int xe, int xb, int bw)
 {
 	uint32_t *cigar = bam_get_cigar(b);
 	bam1_core_t *c = &b->core;
@@ -245,13 +325,15 @@ void idaq(bam1_t *b, const char *ref, double **pd, int xe, int xb, int bw)
          }
     }
     
-    /*fprintf(stderr, "%s:%s:%d n_ins=%d n_del=%d\n", __FILE__, __FUNCTION__, __LINE__, n_ins, n_del);*/
+    fprintf(stderr, "FIXME(%s:%s): return iaq and daq\n", __FILE__, __FUNCTION__);
+    /*fprintf(stderr, "%s:%s:%d n_ins=%d n_del=%d\n", __FILE__, __FUNCTION__, __LINE__, n_ins, n_del);
     if (n_ins) {
          bam_aux_append(b, AI_TAG, 'Z', c->l_qseq+1, iaq);
     }
     if (n_del)  {
          bam_aux_append(b, AD_TAG, 'Z', c->l_qseq+1, daq);
     }
+     */
 
     free(iaq); free(daq);
 }
@@ -270,12 +352,14 @@ void idaq(bam1_t *b, const char *ref, double **pd, int xe, int xb, int bw)
  * need to be preallocated and of length c->l_qseq
  * 
  */
-int bam_prob_realn_core_ext(const bam1_t *b, const char *ref, 
+int bam_prob_realn_core_ext(const bam_lf_t *blf, 
+                            const char *ref, 
                             int baq_flag, int baq_extended,
                             int idaq_flag, 
                             char *baq_str, char *ai_str, char *ad_str)
 {
 /*#define ORIG_BAQ 1*/
+     bam1_t *b = NULL; /* FIXME */ 
      int k, i, bw, x, y, yb, ye, xb, xe;
      uint32_t *cigar = bam_get_cigar(b);
      bam1_core_t *c = &b->core;

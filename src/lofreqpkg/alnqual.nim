@@ -3,13 +3,6 @@
 ## - Author: Andreas Wilm <andreas.wilm@gmail.com>
 ## - License: The MIT License
 
-{.compile: "bam_md_ext.c".}
-{.compile: "kprobaln_ext.c".}
-{.passL: "-L/home/wilma/local/miniconda3/lib/ -lhts"}
-{.passC: "-I/home/wilma/local/miniconda3/include/"}# FIXME use gorge to infer from env var?
-# https://nim-lang.org/docs/manual.html#implementation-specific-pragmas-link-pragma
-# https://nim-lang.org/docs/manual.html#implementation-specific-pragmas-passl-pragma
-# https://nim-lang.org/docs/manual.html#implementation-specific-pragmas-passc-pragma
  
 stderr.writeLine("WARNING: Hardcoded htslib path")
 
@@ -23,55 +16,7 @@ import hts
 
 # project specific
 import utils
-
-# FIXME returns shift
-#proc viterbi_c(sref: cstring, squery: cstring, bqual: ptr uint8,
-#  saln: cstring, def_qual: cint): int {.cdecl, importc: "viterbi".}
-
-# ugly but needed to define bam1_t
-# taken from hts/private/hts_concat.nim
-
-type
-  sam_hrecs_t* {.bycopy.} = object
-  sam_hdr_t* {.bycopy.} = object
-    n_targets*: int32
-    ignore_sam_err*: int32
-    l_text*: csize
-    target_len*: ptr uint32
-    cigar_tab*: ptr int8        ## HTS_DEPRECATED("Use bam_cigar_table[] instead");
-    target_name*: cstringArray
-    text*: cstring
-    sdict*: pointer
-    hrecs*: ptr sam_hrecs_t
-    ref_count*: uint32
-  bam_hdr_t* = sam_hdr_t
-  bam1_core_t* {.bycopy.} = object
-    pos*: int64
-    tid*: int32
-    bin*: uint16               ##  NB: invalid on 64-bit pos
-    qual*: uint8
-    l_extranul*: uint8
-    flag*: uint16
-    l_qname*: uint16
-    n_cigar*: uint32
-    l_qseq*: int32
-    mtid*: int32
-    mpos*: int64
-    isize*: int64
-
-  bam1_t* {.bycopy.} = object
-    core*: bam1_core_t
-    id*: uint64
-    data*: ptr uint8
-    l_data*: cint
-    m_data*: uint32
-    mempolicy* {.bitsize: 2.}: uint32
-    reserved* {.bitsize: 30.}: uint32
-
-
-proc bam_prob_realn_core_ext(b: ptr bam1_t, refsq: cstring, 
-                            baq_flag: cint, baq_extended: cint, idaq_flag: cint, 
-                            baq_str: cstring, ai_str: cstring, ad_str: cstring): int {.cdecl, importc: "viterbi".}
+import bam_md_ext
 
 const AI_TAG = "ai"
 const AD_TAG = "ad"
@@ -156,7 +101,8 @@ proc alnqual*(faFname: string, bamInFname: string) =
     var ad_str = newString(len(query))
     var baq_str = newString(len(query))
 
-    var rc = bam_prob_realn_core_ext(rec.b, refs[chrom], 
+    var bam_lf: bam_lf_t
+    var rc = bam_prob_realn_core_ext(addr bam_lf, refs[chrom], 
                             baq_flag, baq_extended, idaq_flag, 
                             baq_str, ai_str, ad_str)
     notImplementedError
