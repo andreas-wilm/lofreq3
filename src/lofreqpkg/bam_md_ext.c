@@ -137,7 +137,7 @@ static int pacbio_msg_printed = 0;
 
 
 
-void idaq(const bam1_t *b, const char *ref, double **pd, int xe, int xb, int bw);
+void idaq(const bam_lf_t *b, const char *ref, double **pd, int xe, int xb, int bw);
 
 #define set_u(u, b, i, k) { int x=(i)-(b); x=x>0?x:0; (u)=((k)-x+1)*3; }
 #define prob_to_sangerq(p) (p < 0.0 + DBL_EPSILON ? 126+1 : ((int)(-10 * log10(p))+33))
@@ -158,10 +158,10 @@ int u_within_limits(int u, int bw) {
      }
 }     
 
-void idaq(const bam1_t *b, const char *ref, double **pd, int xe, int xb, int bw)
+void idaq(const bam_lf_t *blf, const char *ref, double **pd, int xe, int xb, int bw)
 {
+#ifdef FIXME
 	uint32_t *cigar = bam_get_cigar(b);
-	bam1_core_t *c = &b->core;
     // count the number of indels and compute posterior probability
     uint8_t *iaq = 0, *daq = 0;
     int n_ins = 0, n_del = 0;
@@ -336,6 +336,7 @@ void idaq(const bam1_t *b, const char *ref, double **pd, int xe, int xb, int bw)
      */
 
     free(iaq); free(daq);
+#endif
 }
 
 
@@ -359,10 +360,9 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
                             char *baq_str, char *ai_str, char *ad_str)
 {
 /*#define ORIG_BAQ 1*/
-     bam1_t *b = NULL; /* FIXME */ 
      int k, i, bw, x, y, yb, ye, xb, xe;
-     uint32_t *cigar = bam_get_cigar(b);
-     bam1_core_t *c = &b->core;
+     uint32_t *cigar = blf->cigar;
+
 #ifdef PACBIO_REALN
      kpa_ext_par_t conf = kpa_ext_par_lofreq_pacbio;
      if (! pacbio_msg_printed) {
@@ -373,7 +373,7 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
      kpa_ext_par_t conf = kpa_ext_par_lofreq_illumina;
 #endif
      /*uint8_t *bq = 0, *zq = 0, *qual = bam_get_qual(b);*/
-     uint8_t *qual = bam_get_qual(b);
+     uint8_t *qual = blf->qual;
      uint8_t *prec_ai, *prec_ad, *prec_baq;
      int has_ins = 0, has_del = 0;
      double **pd = 0;
@@ -383,13 +383,18 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
           return 0;
      }
 
-     /*fprintf(stderr, "FIXME baq_flag=%d idaq_flag=%d\n", baq_flag, idaq_flag);*/
+     fprintf(stderr, "FIXME baq_flag=%d idaq_flag=%d\n", baq_flag, idaq_flag);
 
-     /* no alignment? */
+     /* after nim integration BAM_FUNMAP needs to be checked upstream 
+     no alignment? 
      if ((c->flag & BAM_FUNMAP) || b->core.l_qseq == 0) {
           return 0;
      }
-     
+     */
+     if (blf->l_qseq == 0) {
+          return 0;
+     }
+
 /* lofreq3: no modifications here. */
 #if 0
      /* get existing tags. delete if existing and redo is on
@@ -415,8 +420,8 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 #endif
 
 	/* find the start and end of the alignment */
-	x = c->pos, y = 0, yb = ye = xb = xe = -1;
-	for (k = 0; k < c->n_cigar; ++k) {
+	x = blf->pos, y = 0, yb = ye = xb = xe = -1;
+	for (k = 0; k < blf->n_cigar; ++k) {
 		int op, l;
 		op = cigar[k]&0xf; l = cigar[k]>>4;
 		if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {
@@ -444,6 +449,7 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 #endif
         }
 	}
+     fprintf(stderr, "FIXME got  the start and end of the alignment\n");
 
 #if 0
     fprintf(stderr, "%s with cigar %s: baq_flag=%d prec_baq=%p has_del=%d prec_ad=%p has_ins=%d prec_ai=%p, idaq_flag=%d\n", 
@@ -472,8 +478,9 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
     fprintf(stderr, "FIXME what if no ins and no del? can we skip entirely? Not captured in old logic!\n");
 
     if (has_ins || has_del) {
-         pd = calloc(c->l_qseq+1, sizeof(double*));
+         pd = calloc(blf->l_qseq+1, sizeof(double*));
     }
+    fprintf(stderr, "FIXME has_ins=%d has_del=%d\n", has_ins, has_del);
 
     /* either need to compute BAQ or IDAQ 
      */
@@ -484,37 +491,40 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 		bw = abs((xe - xb) - (ye - yb)) + 3;
 	conf.bw = bw;
 	xb -= yb + bw/2; if (xb < 0) xb = 0;
-	xe += c->l_qseq - ye + bw/2;
-	if (xe - xb - c->l_qseq > bw)
-		xb += (xe - xb - c->l_qseq - bw) / 2, xe -= (xe - xb - c->l_qseq - bw) / 2;
+	xe += blf->l_qseq - ye + bw/2;
+	if (xe - xb - blf->l_qseq > bw)
+		xb += (xe - xb - blf->l_qseq - bw) / 2, xe -= (xe - xb - blf->l_qseq - bw) / 2;
+     fprintf(stderr, "FIXME got bandwidth and the start and the end\n");
 
 
 	{ /* glocal */
-		uint8_t *s, *r, *q, *seq = bam_get_seq(b), *bq;
+		uint8_t *s, *r, *q, *seq = blf->seq, *bq;
 		int *state;
-        int bw;
+          int bw;
 
-		bq = calloc(c->l_qseq + 1, 1);
-		memcpy(bq, qual, c->l_qseq);
-		s = calloc(c->l_qseq, 1);
-		for (i = 0; i < c->l_qseq; ++i) s[i] = seq_nt16_int[bam_seqi(seq, i)];
+		bq = calloc(blf->l_qseq + 1, 1);
+		memcpy(bq, qual, blf->l_qseq);
+		s = calloc(blf->l_qseq, 1);
+		for (i = 0; i < blf->l_qseq; ++i) s[i] = seq_nt16_int[bam_seqi(seq, i)];
 		r = calloc(xe - xb, 1);
 		for (i = xb; i < xe; ++i) {
 			if (ref[i] == 0) { xe = i; break; }
 			r[i-xb] = seq_nt16_int[seq_nt16_table[(int)ref[i]]];
 		}
-		state = calloc(c->l_qseq, sizeof(int));
-		q = calloc(c->l_qseq, 1);
+		state = calloc(blf->l_qseq, sizeof(int));
+		q = calloc(blf->l_qseq, 1);
           
           
 #ifdef DEBUG
         fprintf(stderr, "processing read %s\n", bam_get_qname(b));
 #endif
-        kpa_ext_glocal(r, xe-xb, s, c->l_qseq, qual, &conf, state, q, pd, &bw);
+       fprintf(stderr, "FIXME kpa_ext_glocal starting\n");
+       kpa_ext_glocal(r, xe-xb, s, blf->l_qseq, qual, &conf, state, q, pd, &bw);
+       fprintf(stderr, "FIXME kpa_ext_glocal completed\n");
 
         if (baq_flag && ! prec_baq) {
              if (! baq_extended) { // in this block, bq[] is capped by base quality qual[]
-                  for (k = 0, x = c->pos, y = 0; k < c->n_cigar; ++k) {
+                  for (k = 0, x = blf->pos, y = 0; k < blf->n_cigar; ++k) {
                        int op = cigar[k]&0xf, l = cigar[k]>>4;
                        if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {
                             for (i = y; i < y + l; ++i) {
@@ -536,8 +546,8 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
                   
              } else { // in this block, bq[] is BAQ that can be larger than qual[] (different from the above!)
                   uint8_t *left, *rght;
-                  left = calloc(c->l_qseq, 1); rght = calloc(c->l_qseq, 1);
-                  for (k = 0, x = c->pos, y = 0; k < c->n_cigar; ++k) {
+                  left = calloc(blf->l_qseq, 1); rght = calloc(blf->l_qseq, 1);
+                  for (k = 0, x = blf->pos, y = 0; k < blf->n_cigar; ++k) {
                        int op = cigar[k]&0xf, l = cigar[k]>>4;
                        if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {
                             for (i = y; i < y + l; ++i)
@@ -560,7 +570,7 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
              
 #ifndef ORIG_BAQ
              /* need to cap to phred max to be able to store it */
-             for (i = 0; i < c->l_qseq; ++i) {
+             for (i = 0; i < blf->l_qseq; ++i) {
                   if (bq[i] > SANGER_PHRED_MAX) {
                        bq[i] = SANGER_PHRED_MAX;
                   }
@@ -576,7 +586,7 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
              } else bam_aux_append(b, "BQ", 'Z', c->l_qseq + 1, bq);
 #else
              /* lofreq3: dont't modify here: bam_aux_append(b, BAQ_TAG, 'Z', c->l_qseq + 1, bq); */
-             for (i = 0; i < c->l_qseq; ++i) {
+             for (i = 0; i < blf->l_qseq; ++i) {
                   baq_str[i] = encode_q(bq);
              } 
 #endif
@@ -585,16 +595,17 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
         
         
         if (idaq_flag && pd) {/* pd served as previous check to see if ai or ad actually need to be computed */
-             idaq(b, ref, pd, xe, xb, bw);
+           fprintf(stderr, "calling idaq");
+            idaq(blf, ref, pd, xe, xb, bw);
              fprintf(stderr, "FIXME needs to return ai and ad as encoded string. dummy values used here");
-             for (i = 0; i < c->l_qseq; ++i) {
+             for (i = 0; i < blf->l_qseq; ++i) {
                  ai_str[i] = encode_q(2);
                  ad_str[i] = encode_q(2);
              }
         }
         
         if (pd) {
-             for (i = 0; i<=c->l_qseq; ++i) free(pd[i]);
+             for (i = 0; i<=blf->l_qseq; ++i) free(pd[i]);
              free(pd); 
         }
         free(bq); free(s); free(r); free(q); free(state);

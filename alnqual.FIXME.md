@@ -52,6 +52,7 @@ Leave alnqual as lofreq2 module?
 
 - Imported all htslib.h/sam.h constants and defines into bam_md_ext.h
 - Created bam_md_ext.nim with bam_lf as replacement of bam1_core
+- Even if we would have been able to reuse bam1_core it would create a dep on htslib etc.
 - bam1_core_t and bam1_t still contained in bam_md_ext.c to avoid compiler errors for now (but actual vars are NULL)
 
 
@@ -60,3 +61,24 @@ TODO
 - Replace functions bam_get_seq, bam_get_qual, bam_get_cigar by using bam_lf
 - Remove above functions and orphaned bam1_core_t and bam1_t types from bam_md_ext.c
 - Return all three tags and don't modify
+
+
+## 31082020
+
+Reverted yesterday's changes and added htsnim's bam1_core_t and bam1_t tp bam_md_ext.nim and the c equivalents to bam_md_ext.h (no need for bam_lf). compilation works with
+    var rc = bam_prob_realn_core_ext(cast[ptr bam1_t](rec.b), refs[chrom], 
+but segfaults as soon as the data is touched
+
+   var rc = bam_prob_realn_core_ext(rec.b, refs[chrom], 
+should work as well but fails with
+        ... proc bam_prob_realn_core_ext(b: ptr bam1_t; `ref`: cstring; baq_flag: cint;
+        ...                             baq_extended: cint; idaq_flag: cint; baq_str: cstring;
+        ...                             ai_str: cstring; ad_str: cstring): cint
+        ...   first type mismatch at position: 1
+        ...   required type for b: ptr bam1_t
+        ...   but expression 'rec.b' is of type: ptr bam1_t
+        ... expression: bam_prob_realn_core_ext(rec.b, refs[chrom], 1, 1, 1, baq_str, ai_str, ad_str)
+which probably refers to the htslib internal definition of bam1_t. no idea why redefining the same doesn't help
+
+Checked in as alnqual_bam1_t for reference
+
