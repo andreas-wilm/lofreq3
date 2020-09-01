@@ -82,3 +82,21 @@ which probably refers to the htslib internal definition of bam1_t. no idea why r
 
 Checked in as alnqual_bam1_t for reference
 
+## 01092020
+
+- successfully created bam_lf in nim
+- runs through bam_md...core
+- idaq() skipped
+- no values returned
+
+### values between old and new version differ:
+
+old value
+        ../lofreq.git/src/lofreq/lofreq  alnqual $bam   $fa  | grep -v '^@' | head -n 1
+        mut2-read_180_26266     163     NC_000912.1     2       60      100M    =       61      159     ATTTACCGACGAAATTAATACCATCAGGGTATTAAGATGCTACCAACGTGGTATTAAAATGTGCCCAACCGCGAAAAAGAAAGTGGTATATAGGAAAATG  GFDDFFB?HHHHHGHHHHHHHHHHF@FFFHGEHEGHHHHHDGEEHHHHHHHHCA?AFHGGGGDEEHEEDDFHHHEFGGGFHHFDEEE@HHHFHAHHHHHF  NM:i:0  MD:Z:100        MC:Z:100M       AS:i:100        XS:i:0  lb:Z:[envy~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~vmcT
+
+new value:
+        ../lofreq.git/src/lofreq/lofreq  alnqual $bam   $fa  | grep -v '^@' | head -n 1
+        mut2-read_180_26266     163     NC_000912.1     2       60      100M    =       61      159     ATTTACCGACGAAATTAATACCATCAGGGTATTAAGATGCTACCAACGTGGTATTAAAATGTGCCCAACCGCGAAAAAGAAAGTGGTATATAGGAAAATG  GFDDFFB?HHHHHGHHHHHHHHHHF@FFFHGEHEGHHHHHDGEEHHHHHHHHCA?AFHGGGGDEEHEEDDFHHHEFGGGFHHFDEEE@HHHFHAHHHHHF  NM:i:0  MD:Z:100        MC:Z:100M       AS:i:100        XS:i:0  lb:Z:[envy~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~vmcT
+
+check read start, end, bq values etc.

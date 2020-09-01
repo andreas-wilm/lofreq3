@@ -374,7 +374,7 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 #endif
      /*uint8_t *bq = 0, *zq = 0, *qual = bam_get_qual(b);*/
      uint8_t *qual = blf->qual;
-     uint8_t *prec_ai, *prec_ad, *prec_baq;
+     uint8_t *prev_ai = NULL, *prev_ad = NULL, *prev_baq = NULL;
      int has_ins = 0, has_del = 0;
      double **pd = 0;
 
@@ -382,8 +382,6 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
      if (! baq_flag && ! idaq_flag) {
           return 0;
      }
-
-     fprintf(stderr, "FIXME baq_flag=%d idaq_flag=%d\n", baq_flag, idaq_flag);
 
      /* after nim integration BAM_FUNMAP needs to be checked upstream 
      no alignment? 
@@ -399,22 +397,22 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 #if 0
      /* get existing tags. delete if existing and redo is on
       */
-     if ((prec_baq = bam_aux_get(b, BAQ_TAG)) != 0 && *prec_baq == 'Z') {
+     if ((prev_baq = bam_aux_get(b, BAQ_TAG)) != 0 && *prev_baq == 'Z') {
           if (baq_flag==2) {
-               bam_aux_del(b, prec_baq);
-               prec_baq = NULL;
+               bam_aux_del(b, prev_baq);
+               prev_baq = NULL;
           }
      }
-     if ((prec_ai = bam_aux_get(b, AI_TAG)) != 0 && *prec_ai == 'Z') {
+     if ((prev_ai = bam_aux_get(b, AI_TAG)) != 0 && *prev_ai == 'Z') {
           if (idaq_flag==2) {
-               bam_aux_del(b, prec_ai);
-               prec_ai = NULL;
+               bam_aux_del(b, prev_ai);
+               prev_ai = NULL;
           }
      }
-     if ((prec_ad = bam_aux_get(b, AD_TAG)) != 0 && *prec_ad == 'Z') {
+     if ((prev_ad = bam_aux_get(b, AD_TAG)) != 0 && *prev_ad == 'Z') {
           if (idaq_flag==2) {
-               bam_aux_del(b, prec_ad);
-               prec_ad = NULL;
+               bam_aux_del(b, prev_ad);
+               prev_ad = NULL;
           }
      }
 #endif
@@ -449,20 +447,19 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 #endif
         }
 	}
-     fprintf(stderr, "FIXME got  the start and end of the alignment\n");
 
 #if 0
-    fprintf(stderr, "%s with cigar %s: baq_flag=%d prec_baq=%p has_del=%d prec_ad=%p has_ins=%d prec_ai=%p, idaq_flag=%d\n", 
-            bam_get_qname(b), cigar_str_from_bam(b),  baq_flag, prec_baq, has_del, prec_ad, has_ins, prec_ai, idaq_flag);
+    fprintf(stderr, "%s with cigar %s: baq_flag=%d prev_baq=%p has_del=%d prev_ad=%p has_ins=%d prev_ai=%p, idaq_flag=%d\n", 
+            bam_get_qname(b), cigar_str_from_bam(b),  baq_flag, prev_baq, has_del, prev_ad, has_ins, prev_ai, idaq_flag);
 #endif
 #if 0
     /* don't do anything if everything's there already */
-    if (baq_flag==0 || prec_baq) {
+    if (baq_flag==0 || prev_baq) {
          int skip = 1;
-         if (has_del && ! prec_ad) {
+         if (has_del && ! prev_ad) {
               skip = 0;
          }
-         if (has_ins && ! prec_ai) {
+         if (has_ins && ! prev_ai) {
               skip = 0;
          }
          if (skip) {
@@ -494,7 +491,6 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 	xe += blf->l_qseq - ye + bw/2;
 	if (xe - xb - blf->l_qseq > bw)
 		xb += (xe - xb - blf->l_qseq - bw) / 2, xe -= (xe - xb - blf->l_qseq - bw) / 2;
-     fprintf(stderr, "FIXME got bandwidth and the start and the end\n");
 
 
 	{ /* glocal */
@@ -518,11 +514,9 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 #ifdef DEBUG
         fprintf(stderr, "processing read %s\n", bam_get_qname(b));
 #endif
-       fprintf(stderr, "FIXME kpa_ext_glocal starting\n");
        kpa_ext_glocal(r, xe-xb, s, blf->l_qseq, qual, &conf, state, q, pd, &bw);
-       fprintf(stderr, "FIXME kpa_ext_glocal completed\n");
 
-        if (baq_flag && ! prec_baq) {
+        if (baq_flag && ! prev_baq) {
              if (! baq_extended) { // in this block, bq[] is capped by base quality qual[]
                   for (k = 0, x = blf->pos, y = 0; k < blf->n_cigar; ++k) {
                        int op = cigar[k]&0xf, l = cigar[k]>>4;
@@ -589,6 +583,7 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
              for (i = 0; i < blf->l_qseq; ++i) {
                   baq_str[i] = encode_q(bq);
              } 
+             fprintf(stderr, "FIXME set baq_str to %s\n", baq_str);
 #endif
         }
         /* no baq */
@@ -602,7 +597,9 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
                  ai_str[i] = encode_q(2);
                  ad_str[i] = encode_q(2);
              }
-        }
+            fprintf(stderr, "FIXME set ai_str to %s\n", ai_str);
+            fprintf(stderr, "FIXME set ad_str to %s\n", ad_str);
+       }
         
         if (pd) {
              for (i = 0; i<=blf->l_qseq; ++i) free(pd[i]);
