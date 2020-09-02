@@ -19,6 +19,7 @@ import hts
 import utils
 import bam_md_ext
 
+
 const AI_TAG = "ai"
 const AD_TAG = "ad"
 const BAQ_TAG = "lb"
@@ -28,14 +29,9 @@ const BAQ_TAG = "lb"
 template bam_get_seq(b: untyped): untyped =
 #  cast[CPtr[uint8]](cast[uint]((b).data) + uint(((b).core.n_cigar shl 2) + (b).core.l_qname))
   cast[ptr uint8](cast[uint]((b).data) + uint(((b).core.n_cigar shl 2) + (b).core.l_qname))
-
-
-# from htsnim. private there
 template bam_get_seq(b: untyped): untyped =
 #  cast[CPtr[uint8]](cast[uint]((b).data) + uint(((b).core.n_cigar shl 2) + (b).core.l_qname))
   cast[ptr uint8](cast[uint]((b).data) + uint(((b).core.n_cigar shl 2) + (b).core.l_qname))
-
-
 template bam_get_qual*(b: untyped): untyped =
   #cast[CPtr[uint8]](cast[uint]((b).data) + uint(uint((b).core.n_cigar shl 2) + uint((b).core.l_qname) + uint((b.core.l_qseq + 1) shr 1)))
   cast[ptr uint8](cast[uint]((b).data) + uint(uint((b).core.n_cigar shl 2) + uint((b).core.l_qname) + uint((b.core.l_qseq + 1) shr 1)))
@@ -122,13 +118,18 @@ proc alnqual*(faFname: string, bamInFname: string) =
     var ad_str = newString(len(query))
     var baq_str = newString(len(query))
 
+    # bam_lf_t is actually an abstraction of bam1_t that's used everywhere in htslib.
+    # I couldn't reuse this here without having to link against htslib and include the
+    # header and couldn't copy the htsnim definitions here because of weird
+    # name clashes "required type for b: ptr bam1_t but expression 'rec.b' is of type:
+    # ptr bam1_t"
     var bam_lf: bam_lf_t
     bam_lf.pos = cast[int32](rec.start)
-    bam_lf.l_qseq = rec.b.core.l_qseq# FIXME actually len seq which we don't have here yet
-    bam_lf.n_cigar = rec.b.core.n_cigar# FIXME use len(cigar(rec)) instead
-    bam_lf.cigar = bam_get_cigar(rec.b)#(cast[ptr uint32](((cast[int]((rec.b).data)) + cast[int]((rec.b).core.l_qname))))
+    bam_lf.l_qseq = rec.b.core.l_qseq
+    bam_lf.n_cigar = rec.b.core.n_cigar
+    bam_lf.cigar = bam_get_cigar(rec.b)
     bam_lf.qual = bam_get_qual(rec.b)
-    bam_lf.seq = bam_get_seq(rec.b)# our own template might work. after all bam_get_cigar works as well
+    bam_lf.seq = bam_get_seq(rec.b)
     var rc = bam_prob_realn_core_ext(addr bam_lf, refs[chrom], 
                             baq_flag, baq_extended, idaq_flag, 
                             baq_str, ai_str, ad_str)
@@ -139,7 +140,7 @@ proc alnqual*(faFname: string, bamInFname: string) =
     echo createRec(rec, ai_str, ad_str, baq_str)
     #obam.write(createRec(rec, ai_str, ad_str, baq_str))
 
-    notImplementedError
+    #notImplementedError
 
   #oBam.close()
   

@@ -447,7 +447,7 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 #endif
         }
 	}
-
+ 
 #if 0
     fprintf(stderr, "%s with cigar %s: baq_flag=%d prev_baq=%p has_del=%d prev_ad=%p has_ins=%d prev_ai=%p, idaq_flag=%d\n", 
             bam_get_qname(b), cigar_str_from_bam(b),  baq_flag, prev_baq, has_del, prev_ad, has_ins, prev_ai, idaq_flag);
@@ -471,7 +471,6 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
     }
 #endif
 
-
     fprintf(stderr, "FIXME what if no ins and no del? can we skip entirely? Not captured in old logic!\n");
 
     if (has_ins || has_del) {
@@ -491,7 +490,6 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 	xe += blf->l_qseq - ye + bw/2;
 	if (xe - xb - blf->l_qseq > bw)
 		xb += (xe - xb - blf->l_qseq - bw) / 2, xe -= (xe - xb - blf->l_qseq - bw) / 2;
-
 
 	{ /* glocal */
 		uint8_t *s, *r, *q, *seq = blf->seq, *bq;
@@ -581,9 +579,8 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
 #else
              /* lofreq3: dont't modify here: bam_aux_append(b, BAQ_TAG, 'Z', c->l_qseq + 1, bq); */
              for (i = 0; i < blf->l_qseq; ++i) {
-                  baq_str[i] = encode_q(bq);
+                  baq_str[i] = encode_q(bq[i]);
              } 
-             fprintf(stderr, "FIXME set baq_str to %s\n", baq_str);
 #endif
         }
         /* no baq */
