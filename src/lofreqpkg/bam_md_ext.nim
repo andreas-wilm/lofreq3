@@ -14,4 +14,4 @@ type
 
 proc bam_prob_realn_core_ext*(b: ptr bam_lf_t; `ref`: cstring; baq_flag: cint;
                              baq_extended: cint; idaq_flag: cint; baq_str: cstring;
-                             ai_str: cstring; ad_str: cstring): cint {.cdecl, importc: "bam_prob_realn_core_ext".}
+                             ad_str: cstring; ai_str: cstring): cint {.cdecl, importc: "bam_prob_realn_core_ext".}

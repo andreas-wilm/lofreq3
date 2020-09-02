@@ -137,7 +137,7 @@ static int pacbio_msg_printed = 0;
 
 
 
-void idaq(const bam_lf_t *b, const char *ref, double **pd, int xe, int xb, int bw);
+void idaq(const bam_lf_t *b, const char *ref, double **pd, int xe, int xb, int bw, char *bd_str, char *ai_str);
 
 #define set_u(u, b, i, k) { int x=(i)-(b); x=x>0?x:0; (u)=((k)-x+1)*3; }
 #define prob_to_sangerq(p) (p < 0.0 + DBL_EPSILON ? 126+1 : ((int)(-10 * log10(p))+33))
@@ -158,10 +158,9 @@ int u_within_limits(int u, int bw) {
      }
 }     
 
-void idaq(const bam_lf_t *blf, const char *ref, double **pd, int xe, int xb, int bw)
+void idaq(const bam_lf_t *blf, const char *ref, double **pd, int xe, int xb, int bw, char *ad_str, char *ai_str)
 {
-#ifdef FIXME
-	uint32_t *cigar = bam_get_cigar(b);
+   uint32_t *cigar = blf->cigar;
     // count the number of indels and compute posterior probability
     uint8_t *iaq = 0, *daq = 0;
     int n_ins = 0, n_del = 0;
@@ -171,11 +170,11 @@ void idaq(const bam_lf_t *blf, const char *ref, double **pd, int xe, int xb, int
     fprintf(stderr, "Running idaq on %s with cigar %s\n", bam_get_qname(b), cigar_str_from_bam(b));
 #endif
 
-    iaq = calloc(c->l_qseq + 1, 1);
-    daq = calloc(c->l_qseq + 1, 1);
+    iaq = calloc(blf->l_qseq + 1, 1);
+    daq = calloc(blf->l_qseq + 1, 1);
     
     /* init to highest possible value */
-    for (k = 0; k < c->l_qseq; k++) {
+    for (k = 0; k < blf->l_qseq; k++) {
          iaq[k] = daq[k] = '~';
     }
     iaq[k] = daq[k] = '\0';
@@ -185,7 +184,7 @@ void idaq(const bam_lf_t *blf, const char *ref, double **pd, int xe, int xb, int
      * as the sum of the alignment probability of all equivalent indel
      * events. see del_rep and ins_rep handling below 
      */
-    for (k = 0, x = c->pos, y = 0, z = 0; k < c->n_cigar; ++k) { 
+    for (k = 0, x = blf->pos, y = 0, z = 0; k < blf->n_cigar; ++k) { 
          int j, op = cigar[k]&0xf, oplen = cigar[k]>>4;
          // this could be merged into the later block
          if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {
@@ -225,7 +224,7 @@ void idaq(const bam_lf_t *blf, const char *ref, double **pd, int xe, int xb, int
                    }
               }
               for (j = 0; j < del_rep+1; j++) {
-                   if (qpos+j > c->l_qseq) break;
+                   if (qpos+j > blf->l_qseq) break;
                    double *pdi = pd[qpos+j];
                    int u;
 
@@ -270,7 +269,7 @@ void idaq(const bam_lf_t *blf, const char *ref, double **pd, int xe, int xb, int
               if (qpos == 0) continue;
               ins_seq = malloc((oplen+1)*sizeof(char));
               for (j = 0; j < oplen; j++) {
-                   ins_seq[j] = seq_nt16_str[bam_seqi(bam_get_seq(b), y)];
+                   ins_seq[j] = seq_nt16_str[bam_seqi(blf->seq, y)];
                    y++;
                    z++;
               }
@@ -288,7 +287,7 @@ void idaq(const bam_lf_t *blf, const char *ref, double **pd, int xe, int xb, int
                    }
               }
               for (j = 0; j < ins_rep+1; j++) {
-                   if (qpos+j+1 > c->l_qseq) break;
+                   if (qpos+j+1 > blf->l_qseq) break;
                    double *pdi = pd[qpos+j+1]; 
                    int u;
 
@@ -325,18 +324,21 @@ void idaq(const bam_lf_t *blf, const char *ref, double **pd, int xe, int xb, int
          }
     }
     
-    fprintf(stderr, "FIXME(%s:%s): return iaq and daq\n", __FILE__, __FUNCTION__);
-    /*fprintf(stderr, "%s:%s:%d n_ins=%d n_del=%d\n", __FILE__, __FUNCTION__, __LINE__, n_ins, n_del);
-    if (n_ins) {
-         bam_aux_append(b, AI_TAG, 'Z', c->l_qseq+1, iaq);
+     if (n_ins) {
+          int i;
+          for (i = 0; i < blf->l_qseq; ++i) {
+               ai_str[i] = encode_q(iaq[i]);
+          } 
+          /*bam_aux_append(b, AI_TAG, 'Z', c->l_qseq+1, iaq);*/
     }
-    if (n_del)  {
-         bam_aux_append(b, AD_TAG, 'Z', c->l_qseq+1, daq);
+    if (n_del) {
+          int i;
+          for (i = 0; i < blf->l_qseq; ++i) {
+               ad_str[i] = encode_q(daq[i]);
+          } 
+          /*bam_aux_append(b, AD_TAG, 'Z', c->l_qseq+1, daq);*/
     }
-     */
-
     free(iaq); free(daq);
-#endif
 }
 
 
@@ -357,7 +359,7 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
                             const char *ref, 
                             int baq_flag, int baq_extended,
                             int idaq_flag, 
-                            char *baq_str, char *ai_str, char *ad_str)
+                            char *baq_str, char *ad_str, char *ai_str)
 {
 /*#define ORIG_BAQ 1*/
      int k, i, bw, x, y, yb, ye, xb, xe;
@@ -587,15 +589,12 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
         
         
         if (idaq_flag && pd) {/* pd served as previous check to see if ai or ad actually need to be computed */
-           fprintf(stderr, "calling idaq");
-            idaq(blf, ref, pd, xe, xb, bw);
-             fprintf(stderr, "FIXME needs to return ai and ad as encoded string. dummy values used here");
-             for (i = 0; i < blf->l_qseq; ++i) {
-                 ai_str[i] = encode_q(2);
-                 ad_str[i] = encode_q(2);
-             }
-            fprintf(stderr, "FIXME set ai_str to %s\n", ai_str);
-            fprintf(stderr, "FIXME set ad_str to %s\n", ad_str);
+               idaq(blf, ref, pd, xe, xb, bw, ad_str, ai_str);
+               fprintf(stderr, "FIXME got ad_str=%s\n", ad_str);
+               fprintf(stderr, "FIXME got ai_str=%s\n", ai_str);
+       } else {
+               ad_str[0] = '\0';
+               ai_str[0] = '\0';
        }
         
         if (pd) {

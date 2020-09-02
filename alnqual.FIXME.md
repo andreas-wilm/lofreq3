@@ -100,3 +100,7 @@ new value:
         mut2-read_180_26266     163     NC_000912.1     2       60      100M    =       61      159     ATTTACCGACGAAATTAATACCATCAGGGTATTAAGATGCTACCAACGTGGTATTAAAATGTGCCCAACCGCGAAAAAGAAAGTGGTATATAGGAAAATG  GFDDFFB?HHHHHGHHHHHHHHHHF@FFFHGEHEGHHHHHDGEEHHHHHHHHCA?AFHGGGGDEEHEEDDFHHHEFGGGFHHFDEEE@HHHFHAHHHHHF  NM:i:0  MD:Z:100        MC:Z:100M       AS:i:100        XS:i:0  lb:Z:[envy~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~vmcT
 
 check read start, end, bq values etc.
+
+## 02092020
+
+- BAQ now set correctly

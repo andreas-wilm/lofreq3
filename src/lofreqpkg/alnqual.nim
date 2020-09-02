@@ -50,8 +50,10 @@ proc createRec(rec: Record, ai: string, ad: string, baq: string): string =
     when not defined(release):
       var query: string
       discard rec.sequence(query)
-      assert len(ai) == len(ad)
-      assert len(ai) == len(query)
+      if len(ai)>0:
+        assert len(ai) == len(query)
+      if len(ad)>0:
+        assert len(ad) == len(query)
 
     var recSplit = rec.tostring().split('\t')
 
@@ -65,9 +67,12 @@ proc createRec(rec: Record, ai: string, ad: string, baq: string): string =
       recSplit.delete(j-i)
 
     # and add again
-    recSplit.add(AI_TAG & ":Z:" & ai)
-    recSplit.add(AD_TAG & ":Z:" & ad)
-    recSplit.add(BAQ_TAG & ":Z:" & baq)
+    if len(ai)>0:
+      recSplit.add(AI_TAG & ":Z:" & ai)
+    if len(ad)>0:
+      recSplit.add(AD_TAG & ":Z:" & ad)
+    if len(baq)>0:
+      recSplit.add(BAQ_TAG & ":Z:" & baq)
 
     result = recSplit.join("\t")
 
@@ -133,10 +138,14 @@ proc alnqual*(faFname: string, bamInFname: string) =
     var rc = bam_prob_realn_core_ext(addr bam_lf, refs[chrom], 
                             baq_flag, baq_extended, idaq_flag, 
                             baq_str, ai_str, ad_str)
-    echo "FIXME nim baq_str=" & $baq_str
-    echo "FIXME nim ai_str=" & $ai_str
-    echo "FIXME nim ad_str=" & $ad_str
-
+    
+    # fix overallocated strings.
+    if ad_str[0] == '\0':
+      ad_str.setlen(0)
+    if ai_str[0] == '\0':
+      ai_str.setlen(0)
+    if baq_str[0] == '\0':
+      baq_str.setlen(0)
     echo createRec(rec, ai_str, ad_str, baq_str)
     #obam.write(createRec(rec, ai_str, ad_str, baq_str))
 
