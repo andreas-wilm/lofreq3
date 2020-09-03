@@ -88,33 +88,9 @@ const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 const int seq_nt16_int[] = { 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 };
 
 #define bam_seqi(s, i) ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf)
-/* FIXME remove following three once replaced */
-#define bam_get_seq(b)   ((b)->data + ((b)->core.n_cigar<<2) + (b)->core.l_qname)
-#define bam_get_qual(b)  ((b)->data + ((b)->core.n_cigar<<2) + (b)->core.l_qname + (((b)->core.l_qseq + 1)>>1))
-#define bam_get_cigar(b) ((uint32_t*)((b)->data + (b)->core.l_qname))
 
 /* htslib END */
 
-/* FIXME remove the following after replacing */
-typedef struct {
-    int32_t tid;
-    int32_t pos;
-    uint32_t bin:16, qual:8, l_qname:8;
-    uint32_t flag:16, n_cigar:16;
-    int32_t l_qseq;
-    int32_t mtid;
-    int32_t mpos;
-    int32_t isize;
-} bam1_core_t;
-
-typedef struct {
-    bam1_core_t core;
-    int l_data, m_data;
-    uint8_t *data;
-#ifndef BAM_NO_ID
-    uint64_t id;
-#endif
-} bam1_t;
 
 
 
@@ -478,7 +454,6 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
     if (has_ins || has_del) {
          pd = calloc(blf->l_qseq+1, sizeof(double*));
     }
-    fprintf(stderr, "FIXME has_ins=%d has_del=%d\n", has_ins, has_del);
 
     /* either need to compute BAQ or IDAQ 
      */
@@ -590,8 +565,6 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
         
         if (idaq_flag && pd) {/* pd served as previous check to see if ai or ad actually need to be computed */
                idaq(blf, ref, pd, xe, xb, bw, ad_str, ai_str);
-               fprintf(stderr, "FIXME got ad_str=%s\n", ad_str);
-               fprintf(stderr, "FIXME got ai_str=%s\n", ai_str);
        } else {
                ad_str[0] = '\0';
                ai_str[0] = '\0';

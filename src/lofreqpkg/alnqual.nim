@@ -101,9 +101,10 @@ proc alnqual*(faFname: string, bamInFname: string) =
       echo $rec.tostring()
       continue
 
-    #if has_ins or has_del:
+    #if not has_ins or has_del:
     # FIXME then what?
-    
+    stderr.writeLine("FIXME unclear what to do in absence of indels")
+
     # no need to delete existing tags (done in create records)
     # this way we could reuse existing tags in teh c function
     # if needed
@@ -146,12 +147,13 @@ proc alnqual*(faFname: string, bamInFname: string) =
       ai_str.setlen(0)
     if baq_str[0] == '\0':
       baq_str.setlen(0)
-    echo createRec(rec, ai_str, ad_str, baq_str)
-    #obam.write(createRec(rec, ai_str, ad_str, baq_str))
+    echo createRec(rec, ad_str, ai_str, baq_str)
+    #obam.write(createRec(rec, ad_str, ai_str, baq_str))
 
     #notImplementedError
 
   #oBam.close()
+  
   
 when isMainModule:
   #testblock "findHomopolymerRuns":
