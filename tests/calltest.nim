@@ -1,12 +1,11 @@
 # standard library
 import unittest
-import math
 import osproc
-#import strutils
 import tempfile
+
 # project specific
 import ../src/lofreqpkg/call
-#import ../src/lofreqpkg/utils
+
 # third party
 import hts/vcf
 
@@ -26,7 +25,7 @@ suite "call":
     tmpfd.close
     let cmd = lofreq & " call_from_plp -p call_samples/zombie.json > " & tmpname
     #echo "Testing: " & cmd
-    let outp = execProcess(cmd)
+    discard execProcess(cmd)
     var v:VCF
     discard open(v, tmpname)
     var nvars = 0

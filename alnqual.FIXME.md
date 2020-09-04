@@ -114,13 +114,17 @@ check read start, end, bq values etc.
 
         fa=../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta
         bam=../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.bam
-        $ diff <(./lofreq alnqual -f $fa -i $bam 2>&1   | grep -Pow  'ad:Z:.*[^\t]'  | cut -f 1 | head -n 100) <(../lofreq.git/src/lofreq/lofreq  alnqual $bam   $fa 2>&1 |   grep -Pow  'ad:Z:.*[^\t]'  | cut
-        -f 1 | head -n 100)
-        (base) wilma@MININT-HSE913:lofreq3.git$ diff <(./lofreq alnqual -f $fa -i $bam 2>&1   | grep -Pow  'ai:Z:.*[^\t]'  | cut -f 1 | head -n 100) <(../lofreq.git/src/lofreq/lofreq  alnqual $bam   $fa 2>&1 |   grep -Pow  'ai:Z:.*[^\t]'  | cut
-        -f 1 | head -n 100)
-        (base) wilma@MININT-HSE913:lofreq3.git$ diff <(./lofreq alnqual -f $fa -i $bam 2>&1   | grep -Pow  'lb:Z:.*[^\t]'  | cut -f 1 | head -n 100) <(../lofreq.git/src/lofreq/lofreq  alnqual $bam   $fa 2>&1 |   grep -Pow  'lb:Z:.*[^\t]'  | cut
-        -f 1 | head -n 100)
+        $ diff <(./lofreq alnqual -f $fa -i $bam 2>&1   | grep -Pow  'ad:Z:.*[^\t]'  | cut -f 1 | head -n 100) <(../lofreq.git/src/lofreq/lofreq  alnqual $bam   $fa 2>&1 |   grep -Pow  'ad:Z:.*[^\t]'  | cut -f 1 | head -n 100)
+        (base) wilma@MININT-HSE913:lofreq3.git$ diff <(./lofreq alnqual -f $fa -i $bam 2>&1   | grep -Pow  'ai:Z:.*[^\t]'  | cut -f 1 | head -n 100) <(../lofreq.git/src/lofreq/lofreq  alnqual $bam   $fa 2>&1 |   grep -Pow  'ai:Z:.*[^\t]'  | cut -f 1 | head -n 100)
+        (base) wilma@MININT-HSE913:lofreq3.git$ diff <(./lofreq alnqual -f $fa -i $bam 2>&1   | grep -Pow  'lb:Z:.*[^\t]'  | cut -f 1 | head -n 100) <(../lofreq.git/src/lofreq/lofreq  alnqual $bam   $fa 2>&1 |   grep -Pow  'lb:Z:.*[^\t]'  | cut -f 1 | head -n 100)
 
 - TODO: add unit tests and longer test
 - TODO: determine what to do without indels
     looks like we can skip (Nim & C) `../lofreq.git/src/lofreq/lofreq  alnqual $bam   $fa 2>&1  | awk -F "\t" '$6 == "100M"' | grep a[id]:Z:`
+
+## 05092020
+
+- Added simple unit test
+- Removed all debugging
+- samtools conversion works
+- TODO: add long running test

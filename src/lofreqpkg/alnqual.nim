@@ -4,8 +4,6 @@
 ## - License: The MIT License
 
  
-stderr.writeLine("WARNING: Hardcoded htslib path")
-
 # standard
 import tables
 import strutils
@@ -20,9 +18,9 @@ import utils
 import bam_md_ext
 
 
-const AI_TAG = "ai"
-const AD_TAG = "ad"
-const BAQ_TAG = "lb"
+const AI_TAG* = "ai"
+const AD_TAG* = "ad"
+const BAQ_TAG* = "lb"
 
 
 # from htsnim. private there
@@ -42,18 +40,18 @@ proc skipRead(rec: Record): bool =
     return true
   return false
   
-
-proc createRec(rec: Record, ai: string, ad: string, baq: string): string =
+ 
+proc createRec(rec: Record, aqs: aln_qual_strgs): string =
     # We can't set BAM values in htsnim (argh), so convert to string / SAM
     # as in https://github.com/brentp/bamject/blob/master/src/bamject.nim
 
     when not defined(release):
       var query: string
       discard rec.sequence(query)
-      if len(ai)>0:
-        assert len(ai) == len(query)
-      if len(ad)>0:
-        assert len(ad) == len(query)
+      if len(aqs.ai_str)>0:
+        assert len(aqs.ai_str) == len(query)
+      if len(aqs.ad_str)>0:
+        assert len(aqs.ad_str) == len(query)
 
     var recSplit = rec.tostring().split('\t')
 
@@ -67,12 +65,12 @@ proc createRec(rec: Record, ai: string, ad: string, baq: string): string =
       recSplit.delete(j-i)
 
     # and add again
-    if len(ai)>0:
-      recSplit.add(AI_TAG & ":Z:" & ai)
-    if len(ad)>0:
-      recSplit.add(AD_TAG & ":Z:" & ad)
-    if len(baq)>0:
-      recSplit.add(BAQ_TAG & ":Z:" & baq)
+    if len(aqs.ai_str)>0:
+      recSplit.add(AI_TAG & ":Z:" & aqs.ai_str)
+    if len(aqs.ad_str)>0:
+      recSplit.add(AD_TAG & ":Z:" & aqs.ad_str)
+    if len(aqs.baq_str)>0:
+      recSplit.add(BAQ_TAG & ":Z:" & aqs.baq_str)
 
     result = recSplit.join("\t")
 
@@ -101,15 +99,11 @@ proc alnqual*(faFname: string, bamInFname: string) =
       echo $rec.tostring()
       continue
 
-    #if not has_ins or has_del:
-    # FIXME then what?
-    stderr.writeLine("FIXME unclear what to do in absence of indels")
-
-    # no need to delete existing tags (done in create records)
-    # this way we could reuse existing tags in teh c function
+    # No need to delete existing tags here (done in createRecords).
+    # This way we could reuse existing tags in the c function
     # if needed
     
-    # load reference if not cached
+    # Load reference if not cached
     var chrom = rec.chrom
     if not refs.hasKey(chrom):
       #stderr.writeLine("DEBUG Loading " & chrom)
@@ -120,9 +114,7 @@ proc alnqual*(faFname: string, bamInFname: string) =
     const idaq_flag = 1
     var query: string
     discard rec.sequence(query)
-    var ai_str = newString(len(query))
-    var ad_str = newString(len(query))
-    var baq_str = newString(len(query))
+    
 
     # bam_lf_t is actually an abstraction of bam1_t that's used everywhere in htslib.
     # I couldn't reuse this here without having to link against htslib and include the
@@ -136,21 +128,24 @@ proc alnqual*(faFname: string, bamInFname: string) =
     bam_lf.cigar = bam_get_cigar(rec.b)
     bam_lf.qual = bam_get_qual(rec.b)
     bam_lf.seq = bam_get_seq(rec.b)
-    var rc = bam_prob_realn_core_ext(addr bam_lf, refs[chrom], 
-                            baq_flag, baq_extended, idaq_flag, 
-                            baq_str, ai_str, ad_str)
+    var aqs: aln_qual_strgs
+    aqs.ai_str = newString(len(query))
+    aqs.ad_str = newString(len(query))
+    aqs.baq_str = newString(len(query))
     
-    # fix overallocated strings.
-    if ad_str[0] == '\0':
-      ad_str.setlen(0)
-    if ai_str[0] == '\0':
-      ai_str.setlen(0)
-    if baq_str[0] == '\0':
-      baq_str.setlen(0)
-    echo createRec(rec, ad_str, ai_str, baq_str)
-    #obam.write(createRec(rec, ad_str, ai_str, baq_str))
+    var rc = bam_prob_realn_core_ext(addr bam_lf, refs[chrom], 
+                            baq_flag, baq_extended, idaq_flag, aqs)
+    doAssert rc == 0
 
-    #notImplementedError
+    # fix overallocated strings.
+    if aqs.ad_str[0] == '\0':
+      aqs.ad_str.setlen(0)
+    if aqs.ai_str[0] == '\0':
+      aqs.ai_str.setlen(0)
+    if aqs.baq_str[0] == '\0':
+      aqs.baq_str.setlen(0)
+    echo createRec(rec, aqs)
+    #obam.write(createRec(rec, ad_str, ai_str, baq_str))
 
   #oBam.close()
   
@@ -159,6 +154,4 @@ when isMainModule:
   #testblock "findHomopolymerRuns":
   #  let x = findHomopolymerRuns("AACCCTTTTA")
   #  doAssert x == @[2, 1, 3, 1, 1, 4, 1, 1, 1, 1]
-
-
-  echo "OK: all tests passed"
+  echo "OK: no tests"

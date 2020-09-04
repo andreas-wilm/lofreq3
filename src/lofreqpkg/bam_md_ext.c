@@ -356,44 +356,20 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
      int has_ins = 0, has_del = 0;
      double **pd = 0;
 
+     ad_str[0] = '\0';
+     ai_str[0] = '\0';
+     baq_str[0] = '\0';
+
      /* nothing to do ? */
      if (! baq_flag && ! idaq_flag) {
           return 0;
      }
 
-     /* after nim integration BAM_FUNMAP needs to be checked upstream 
-     no alignment? 
-     if ((c->flag & BAM_FUNMAP) || b->core.l_qseq == 0) {
+     /* no alignment? can't check here! 
+     if ((c->flag & BAM_FUNMAP) || blf->l_qseq == 0) {
           return 0;
      }
      */
-     if (blf->l_qseq == 0) {
-          return 0;
-     }
-
-/* lofreq3: no modifications here. */
-#if 0
-     /* get existing tags. delete if existing and redo is on
-      */
-     if ((prev_baq = bam_aux_get(b, BAQ_TAG)) != 0 && *prev_baq == 'Z') {
-          if (baq_flag==2) {
-               bam_aux_del(b, prev_baq);
-               prev_baq = NULL;
-          }
-     }
-     if ((prev_ai = bam_aux_get(b, AI_TAG)) != 0 && *prev_ai == 'Z') {
-          if (idaq_flag==2) {
-               bam_aux_del(b, prev_ai);
-               prev_ai = NULL;
-          }
-     }
-     if ((prev_ad = bam_aux_get(b, AD_TAG)) != 0 && *prev_ad == 'Z') {
-          if (idaq_flag==2) {
-               bam_aux_del(b, prev_ad);
-               prev_ad = NULL;
-          }
-     }
-#endif
 
 	/* find the start and end of the alignment */
 	x = blf->pos, y = 0, yb = ye = xb = xe = -1;
@@ -426,10 +402,7 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
         }
 	}
  
-#if 0
-    fprintf(stderr, "%s with cigar %s: baq_flag=%d prev_baq=%p has_del=%d prev_ad=%p has_ins=%d prev_ai=%p, idaq_flag=%d\n", 
-            bam_get_qname(b), cigar_str_from_bam(b),  baq_flag, prev_baq, has_del, prev_ad, has_ins, prev_ai, idaq_flag);
-#endif
+
 #if 0
     /* don't do anything if everything's there already */
     if (baq_flag==0 || prev_baq) {
@@ -448,8 +421,6 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
          }
     }
 #endif
-
-    fprintf(stderr, "FIXME what if no ins and no del? can we skip entirely? Not captured in old logic!\n");
 
     if (has_ins || has_del) {
          pd = calloc(blf->l_qseq+1, sizeof(double*));
@@ -565,14 +536,11 @@ int bam_prob_realn_core_ext(const bam_lf_t *blf,
         
         if (idaq_flag && pd) {/* pd served as previous check to see if ai or ad actually need to be computed */
                idaq(blf, ref, pd, xe, xb, bw, ad_str, ai_str);
-       } else {
-               ad_str[0] = '\0';
-               ai_str[0] = '\0';
-       }
+        }
         
         if (pd) {
-             for (i = 0; i<=blf->l_qseq; ++i) free(pd[i]);
-             free(pd); 
+               for (i = 0; i<=blf->l_qseq; ++i) free(pd[i]);
+               free(pd); 
         }
         free(bq); free(s); free(r); free(q); free(state);
 	}
