@@ -16,7 +16,6 @@ import algorithm
 import hts
 
 # project specific
-import utils
 
 
 # returns shift

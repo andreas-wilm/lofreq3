@@ -44,7 +44,6 @@ datasets. Nucleic Acids Res. 2012;
   - [Testing](#testing)
   - [Documentation:](#documentation)
   - [Performance](#performance)
-  - [Features](#features)
   - [Release](#release)
 
 ## For the impatient
@@ -196,7 +195,6 @@ cligen@0.9.37, hts@0.2.19, tempfile@0.1.7
 
 # To Do List
 
-
 ## Testing
 
 - Write snakefile for end to end testing of each step and comparison to old LoFreq (run both)
@@ -221,10 +219,6 @@ cligen@0.9.37, hts@0.2.19, tempfile@0.1.7
   skips that parsing just for benchmark purposes?)
 - Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode
 
-
-## Features
-
-- Reimplement indel qual. Challenge is to remove htslib dep and compute BAQ at the same time
-
 ## Release
+
 - Create release with static binary and announce availability

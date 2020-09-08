@@ -106,7 +106,7 @@ proc getDindelQual(rec: Record, homopolymerRuns: seq[int]): (string, string) =
       stderr.writeLine("DEBUG dindelq=" & dindelq)
       stderr.writeLine("DEBUG   query=" & query)
       stderr.writeLine("DEBUG   cigar=" & $rec.cigar)
-  assert len(dindelq) == len(query)
+    assert len(dindelq) == len(query)
       
   result = (dindelq, dindelq)
 

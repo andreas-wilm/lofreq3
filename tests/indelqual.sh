@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -eux
+#set -eux
+set -eu
 
 # a BAM with reads containing indels
 inbam=NC_000912_Mpneumoniae/viterbi/NC_000912_Mpneumoniae_comb.srt.indelonly.bam
