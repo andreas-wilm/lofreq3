@@ -1,16 +1,14 @@
 # LoFreq Version 3
 
-This version is a reimplementation of [LoFreq version
-2](http://csb5.github.io/lofreq/) in [Nim](https://nim-lang.org/). The current version is still under development, but already provides basic functionlity. For
-example, it comes with a multipurpose pileup engine, that generates a quality
-histogram for mis/matches and indels per position in JSON format and calls variants from this input. It is however missing preprocessing modules (e.g. realignment and insertion of alignment quality) that version 2 provided.
+LoFreq Version 3 is a reimplementation of [LoFreq version
+2](http://csb5.github.io/lofreq/) in [Nim](https://nim-lang.org/).
 
-## Why a new version
-
-The old code had aquired a lot of technical depth, which eventually limited its extensibility and also affected usage of the program. We furthermore wanted a modular design with complete separation of the pileup and the variant calling process.
+After almost 10 years the old code had acquired a lot of technical depth, which eventually limited its extensibility and also affected usage of the program. We furthermore wanted a modular design with complete separation of the pileup and the variant calling process.
 
 We chose [Nim](https://nim-lang.org/) for a reimplementation, because Nim has an intuitive and clean syntax. It looks similar to Python and compiles via C to small and fast binaries. And it's simply fun. Thanks to Brent Petersen the required [htslib library for
 Nim](https://github.com/brentp/hts-nim) exists. We hope that this reimplementation ensures that the LoFreq development continues.
+
+This version is fully functional, however, the pileup process is currently much slower than in the old version and will be rewritten soon.
 
 ## Citation
 
@@ -24,13 +22,11 @@ datasets. Nucleic Acids Res. 2012;
 ## Table of contents
 
 - [LoFreq Version 3](#lofreq-version-3)
-  - [Why a new version](#why-a-new-version)
   - [Citation](#citation)
   - [Table of contents](#table-of-contents)
   - [For the impatient](#for-the-impatient)
-  - [LoFreq explained](#lofreq-explained)
+  - [LoFreq in detail](#lofreq-in-detail)
     - [The idea](#the-idea)
-    - [Overview of the workflow](#overview-of-the-workflow)
     - [Preprocessing of your BAM file](#preprocessing-of-your-bam-file)
     - [Pileup](#pileup)
       - [Notes on Illumina's Read Segment Quality Control Indicator](#notes-on-illuminas-read-segment-quality-control-indicator)
@@ -38,70 +34,59 @@ datasets. Nucleic Acids Res. 2012;
     - [Postprocessing of variants](#postprocessing-of-variants)
   - [Installation](#installation)
     - [Installing a binary release](#installing-a-binary-release)
-    - [Using a container](#using-a-container)
     - [Compilation from source](#compilation-from-source)
-- [To Do List](#to-do-list)
-  - [Testing](#testing)
-  - [Documentation:](#documentation)
-  - [Performance](#performance)
-  - [Release](#release)
+  - [To Do List](#to-do-list)
 
 ## For the impatient
 
+LoFreq is called through a single binary called `lofreq`. It's main purpose is to call variants from a preprocessed BAM file.
+ 
+You will achieve best variant calling results by following the following preprocessing steps for your reads:
 
-LoFreq comes with one binary called `lofreq`. This binary supports sub-commands, currently `call` and `call_from_plp`. Run `lofreq help` or `lofreq cmd --help` to display usage information, parameters etc.
+1. Align your reads with a mapper that produces mapping qualities, e.g. [BWA](http://bio-bwa.sourceforge.net/)
+1. Recommended: Realign the reads with indels with the base quality aware `lofreq viterbi`
+1. Sort the BAM file with `samtools sort` (`viterbi` will change the alignment position of some reads)
+1. Required for indel calling: Add indel qualities (previously also done in GATK's BQSR step) `lofreq indelqual`
+1. Recommended: Add base- and indel alignment qualities ([BAQ](https://pubmed.ncbi.nlm.nih.gov/21320865/) and a LoFreq equivalent for indels) with `lofreq alnqual`
 
-Use the following to call variants in BAM file `aln.bam` against reference `ref.fa` at chromosome `chr` between positions `s` to `e`:
+As one step the above looks as follows:
+
+    obam=your-output.bam;
+    reffa=your-ref.fasta
+    fq1=your-R1.fq.gz
+    fq2=your-R2.fq.gz
+    bwa mem $reffa  $fq1 $fq2 | \
+      samtools fixmate - - | \
+      lofreq viterbi -f $reffa -i - | \
+      samtools sort - | \
+      lofreq indelqual -f $reffa -i - | \
+      lofreq alnqual -f $reffa  -i - | \
+      samtools view -b - -o $obam;
+
+
+Then, use `lofreq call` to call variants in the processed BAM file. The following will call variants in BAM file `aln.bam` against reference `ref.fa` at chromosome `chr` between positions `s` to `e`:
 
     lofreq call -b aln.bam -f ref.fa -r chr:s-e
 
+Finally filter variants on base quality and for example strand-bias as needed with `bcftools`.
 
-To create a pileup in JSON format (with merged qualities) run as above, but with added `-p`
-
-    lofreq call -b aln.bam -f ref.fa -r chr:s-e -p
-
+Use  `lofreq help` or `lofreq cmd --help` to display usage information, parameters etc.
 
 
-## LoFreq explained
-
-**FIXME**
+## LoFreq in detail
 
 ### The idea
 
-**FIXME**
+LoFreq was originally developed as a quality-aware low-frequency variant caller. The main design goal was to find rare variants caused by haplotypes in viral or bacterial populations. Because it's quality aware, it is also largely parameter free and applicable to many sequencing technologies, assuming that the qualities are actually meaningful and translate into error probabilities and are calibrated. This assumption is not entirely true for example for mapping qualities (see [Lee et al. 2014)](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0090581). Another simplifying assumption is that all qualities (base-qualities, indel-qualities, mapping-qualities and alignment qualities) are independent. LoFreq merges all these qualities into one error probability and predict variants based on a poission-binomial distribution. This allows us to assign meaningful qualities to variants, which actually translate into the probability that a variant was called by chance.
 
-- Originally design to be a technology indepedent, quality-aware low-frequency variant caller. Can be used to find rare variants caused by haplotypes in viral or bacterial population.
-- Because quality aware, largely parameter free and applicable to many sequencing technologies
-- All sequencing related qualities are error probabilities.
-- Ideally calibrated.
-- Hard for MQ (see [Lee et al. 2014)](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0090581)
-- One other assumption is that all positions are independent.
-- Preprocessing crucial
-- Originally built for viral/bacterial data for which GATK best practices is not recommended
-
-### Overview of the workflow
-
-A recommended preprocessing workflow looks as follows:
-
-1. Align reads with BWA
-2. Optional: Quality aware base realignment with LoFreq2's `viterbi`
-3. Required for indel calling: Insertion of indel qualities with LoFreq2's `indelqual` (also done by GATK's BQSR).
-4. Recommended: Base quality recalibration with GATK's BQSR
-5. Recommended: Insertion of alignment qualities with LoFreq2's `alnqual`
-6. [Variant calling with `lofreq call`](#calling)
-7. [Postprocessing](#postprocessing-of-variants)
 
 ### Preprocessing of your BAM file
 
-Steps prior to the pileup stage are usually referred to as preprocessing.
+Read mappers can make tiny mistakes on the base level, which can result in spurious variant calls. To avoid this `lofreq viterbi` for a base-quality aware realignment of reads with indels.
 
-LoFreq depends on quality values and a raw BAM file will usually only contain
-raw base qualities and mapping qualities. Ideally you calibrate mapping qualities and add other qualities (indel qualities, alignment qualities like BAQ) to the BAM file.
+LoFreq makes heavy use of quality values and raw BAM files usually only contain raw base qualities and mapping qualities. We therefore recommend that you calibrate mapping qualities (e.g. GATK's BQSR, but be aware of assumption it makes) and add other qualities (indel qualities and alignment qualities) with `lofreq indelqual` and `lofreq alnqual`.
 
-This version of LoFreq doesn't implement any preprocessing steps. Please refer
-to LoFreq version 2.
-
-**FIXME**
+While the variant calling step itself is sequencing-technology agnostic, the three pre-processing steps above are optimized for Illumina reads and cannot be easily applied to e.g. Nanopore data.
 
 ### Pileup
 
@@ -116,7 +101,7 @@ mind that LoFreq was designed to model and deal with sequencing (and mapping) er
 The pileup also performs merging of qualities, e.g. mapping and base quality, an
 idea intrinsic to LoFreq version 2. The output file stores one quality per base.
 The idea for quality merging is as follows: all qualities stored in a BAM file
-are (or should in theory be) [Phred scaled](https://en.wikipedia.org/wiki/Phred_quality_score) error probabilties.
+are (or should in theory be) [Phred scaled](https://en.wikipedia.org/wiki/Phred_quality_score) error probabilities.
 For example, a base quality of 20 means, there is a 1% chance that this is in fact another base.
 To combine mapping `p_m`, alignment `p_a` and base qualities `p_bq` you can do the following:
 
@@ -132,41 +117,42 @@ aligned (`p_a`) and if it's neither mismapped nor misaligned
 A base quality (BQ) of value 2 (ASCII: `#`) is used by Illumina as so called "Read Segment Quality
 Control Indicator". Here, the quality of 2 is in fact not a quality or error
 probability, but just means that the sequencing machine wasn't sure about an
-entire segment in the read. This affects LoFreq, which treats qualities as error probabilties, and thus bases with low quality as
-bases with high error probabilty.
+entire segment in the read. This affects LoFreq, which treats qualities as error probabilities, and thus bases with low quality as
+bases with high error probability.
 
 To deal with this problem all bases with BQ=2 are marked by the pileup function with a quality of -1 (argument `--minBQ`). And matches/mismatches with quality <0 are ignored by the variant calling routine. This effectively filters bases with BQ2, but still keeps them visible in the pileup (with quality -1).
 
 Variant calls at position with lots of bases with BQ2 are to be taken with a grain of salt. You can get very different results depending on whether you include them (SNV call less likely because of perceived high chances of error) or not (SNV call more likely).
 
-We discourage users from changing the default of `--minBQ 3`. LoFreq is build to deal with erros and excessive filtering will bias results.
+We discourage users from changing the default of `--minBQ 3`. LoFreq is build to deal with errors and excessive filtering will bias results.
 
 ### Variant Calling
 
 This step calls variants and outputs a
 VCF file. It is implemented in the `lofreq call` command. Default
-variant quality filtering (`--minVarQual`) and allele frequency filters (`--minAF`) are applied.
-See `lofreq call --help` for default values.
+variant quality filtering (`--minVarQual`) and allele frequency filters (`--minAF`) are applied. You can in addition filter bases below a minimum base quality (`--minBQ`)  and variants within a coverage range (`--minCov` and `--maxCov`).
 
-Strand bias (SB) is reported by not used for filtering by default. Note that strand bias doesn't mean that one strand has more bases then the other, but that the distribution of alt anf ref bases between forward and reverse strand is skewed. This is tested with Fisher's Exact test as also done in samtools.
+We do not recommend to change default filters, unless you know exactly what you are doing. Especially `--minBQ` is often misused. Remember that LoFreq builds error probabilities into its calling model and excessive filtering will create unwanted biases.
 
-Unless your samples were highly PCR amplified, we suggest to filter on strand bias.
+See `lofreq call --help` for all supported parameters and default values.
+
+Strand bias (SB) is reported by not used for filtering by default. Note that strand bias doesn't mean that one strand has more bases then the other, but that the distribution of alt and ref bases between forward and reverse strand is skewed. This is tested with Fisher's Exact test as also done in samtools.
+
+Unless your samples were highly PCR amplified, we suggest to filter on strand bias (with e.g. bcftools).
 
 
 ### Postprocessing of variants
 
 
-- **FIXME**: bcftools command
-- **FIXME**: paper explaining strand bias it
+- **TODO**: bcftools command
+- **TODO**: explain strand bias
 
 
 ## Installation
 
 ### Installing a binary release
 
-**FIXME**
-
-### Using a container
+**TODO**
 
 ### Compilation from source
 
@@ -184,41 +170,28 @@ LD_LIBRARY_PATH as well.
 
     export LD_LIBRARY_PATH=YOUR_MINICONDA_PATH/lib:$LD_LIBRARY_PATH
 
-Easiest way is to install htslib is to use [bioconda](FIXME):
+Easiest way is to install htslib is to use [bioconda](https://bioconda.github.io/):
 
     conda install htslib
 
 Installation of other dependencies is taking care of by Nimble.
 
-This version is know to work with:
-cligen@0.9.37, hts@0.2.19, tempfile@0.1.7
 
-# To Do List
+## To Do List
 
-## Testing
+In order of importance
 
-- Write snakefile for end to end testing of each step and comparison to old LoFreq (run both)
-- Test merged qualities against old lofreq
-- Full test against spike in data
-- mincov and maxcov filter (coverage() function) in the presence of indels
-- Coverage in vcf
-- SB output in vcf
-- Add CI on Github
-- Implement filter or doc bcftools recipes (and add docs)
-- Note: If nimble test is too limiting: https://github.com/ryanlayer/ssshtest
+- Testing: end to end testing (and comparison to old LoFreq) on spike-in and real data and publish as notebook
+- Testing: mincov and maxcov filter (coverage() function) in the presence of indels
+- Testing: Coverage in vcf
+- Testing: SB output in vcf
+- Docs: Add installation notes
+- Docs: Add docs on filtering (bcftools recipes)
+- Release: tag version and provide binary compiled with hts_nim_static_builder
+- Testing: Add CI on Github
+- Docs: Add FAQ
+- Release: Create roadmap
+- Performance: Rewrite pileup
+- Performance: Parallelism: reader queue with async calling (sidestepping json conversion)
+- Performance: Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode
 
-## Documentation:
-
-- Add FAQ
-
-## Performance
-
-- Rewrite pileup
-- Parallelism: reader queue with async calling (sidestepping json conversion)
-- even the release compiled version is a few times slower then the old version (write version that
-  skips that parsing just for benchmark purposes?)
-- Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode
-
-## Release
-
-- Create release with static binary and announce availability
