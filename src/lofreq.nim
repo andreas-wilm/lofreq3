@@ -56,7 +56,7 @@ when isMainModule:
               "noMQ": "ignore mapping quality (applied at pileup stage)",
               "pileup": "Don't call variants, but print pileup as JSON instead. See also 'pretty')",
               "pretty": "pretty JSON output (cannot be used with callNow)"},
-      short = {"bamFname": 'b',
+      short = {"bamFname": 'i',
                "faFname": 'f',
                "regions": 'r',
                "bedFname": 'l',

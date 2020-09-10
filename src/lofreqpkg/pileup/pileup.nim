@@ -7,10 +7,10 @@
 ## - License: The MIT License
 
 # standard
-#import os
 import times
 import logging
 import strutils
+import sequtils
 
 # third party
 import hts
@@ -44,17 +44,25 @@ proc fullPileup*(bamFname: string, faFname = "", regionsStr = "", bedFile = "",
   else:
     logger.log(lvlInfo, "No reference file given")
 
-  if len(regionsStr)==0 and len(bedFile)==0:
-    quit("Need either region or bed argument")
-    # FIXME or autofill from BAM
 
-  for reg in getRegions(regionsStr, bedFile):
-    #regions.split(','):
-    #var reg = reg_from_str(reg_str)
-    #
-    #if reg.s == 0 and reg.e == 0:# only sq given instead of full region
-    #  var targets = targets(bam.hdr)
-    #  reg = auto_fill_region(reg, targets)
+    for i in 0..<len(fai):
+      let n = fai[i]
+      let l = fai.chrom_len(fai[i])
+      echo n & " " & $l
+    #quit("FIXME")
+
+  if len(regionsStr) != 0 and len(bedFile) != 0:
+    quit("Can't read regions from bed and string at the same time")   
+
+  var regions: seq[Region]
+  if len(regionsStr) != 0:
+    regions = toSeq(parseRegionsStr(regionsStr))
+  elif len(bedFile) != 0:
+    regions = toSeq(getBedRegions(bedFile))
+  else:
+    regions = toSeq(getBamRegions(bam))
+
+  for reg in regions:
     logger.log(lvlInfo, "Starting pileup for " & $reg)
 
     var records = newRecordFilter(bam, reg.sq, reg.s, reg.e)
