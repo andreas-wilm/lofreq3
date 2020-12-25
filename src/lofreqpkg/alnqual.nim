@@ -7,14 +7,14 @@
 # standard
 import tables
 import strutils
-import strformat
+#import strformat
 
 # third party
 import hts
 #import hts/bam/cigar
 
 # project specific
-import utils
+#import utils
 import bam_md_ext
 
 

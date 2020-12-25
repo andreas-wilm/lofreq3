@@ -114,6 +114,6 @@ proc call*(bamFname: string, faFname: string, regions = "", bedFname = "",
   plpParams.maxCov = maxCov
   plpParams.minBQ = minBQ
   plpParams.useMQ = not noMQ
-  full_pileup(bamFname, faFname, regions, bedFname, p)
+  fullPileup(bamFname, faFname, regions, bedFname, p)
 
 
