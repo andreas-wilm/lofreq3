@@ -55,8 +55,7 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
                   nextevent: CigarElement,
                   processor: var TProcessor,
                   read: Record, reference: TSequence,
-                  readOffset: int, refOffset: int64,
-                  readQualityBuffer: TReadQualityBuffer): (int, int64) {.inline.} =
+                  readOffset: int, refOffset: int64): (int, int64) {.inline.} =
   ## Processes one event (cigar element) on the read and returns the updated
   ## offset. The event is described by the first argument, 'event'.
   ## The parameter 'processor' provides a reference to the processor used to
@@ -78,21 +77,21 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
   if consumes.query and consumes.reference:
     # mutual, process all matches
     processor.processMatches(readOffset, refOffset, event.len,
-      read, reference, nextevent, readQualityBuffer)
+      read, reference, nextevent)
     return (readOffset + event.len, refOffset + event.len)
 
   elif consumes.reference:# also true for 'N'
     # reference only, process deletion
     if event.op == CigarOp.deletion:
       processor.processDeletion(readOffset, refOffset, event.len,
-        read, reference, readQualityBuffer)
+        read, reference)
     return (readOffset, refOffset + event.len)
 
   elif consumes.query:# also true for 'S'
     # read only, process insertion
     if event.op == CigarOp.insert:
       processor.processInsertion(readOffset, refOffset, event.len,
-        read, reference, readQualityBuffer)
+        read, reference)
     return (readOffset + event.len, refOffset)
 
   else:
@@ -137,11 +136,8 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
         refOffset = int64(read.start)
 
       
-      # buffer all qualities for optimization. only parse qualities once here
-      let readQualityBuffer = read.getReadQualityBuffer()
-
       # tell the processor that the new read is about to start
-      processor.beginRead(read.start)
+      processor.beginRead(read)
 
       # process all events on the read
       # unfortunately we need to know the next event to avoid
@@ -153,7 +149,7 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
         if idx+1 < len(cigar):
           nextevent = cigar[idx+1]
         (readOffset, refOffset) = processEvent(event, nextevent,
-          processor, read, reference, readOffset, refOffset, readQualityBuffer)
+          processor, read, reference, readOffset, refOffset)
 
   # inform the processor that the pileup is done
   processor.done()

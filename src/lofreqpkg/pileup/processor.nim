@@ -60,7 +60,7 @@ type Processor[TStorage] = ref object
   matchQualityAt: TQualityProc# FIXME remove
   deletionQualityAt: TQualityProc# FIXME remove
   insertionQualityAt: TQualityProc# FIXME remove
-  readQualityBuffer: TReadQualityBuffer
+  readQualityBuffer: TReadQualityBuffer# of current read
   useMQ: bool
   minBQ: int# minimum base quality. everything below will be recorded as -1.
 
@@ -188,6 +188,7 @@ proc getReadQualityBuffer*(r: Record): TReadQualityBuffer =
     discard r.delAlnQualities(result.delAlnQuals)
 
 
+
 # FIXME use qual buffer instead
 proc matchQual(r: Record, i: int, useMQ: bool): Natural =
   var q_m = high(int)
@@ -236,7 +237,7 @@ proc newProcessor*[TStorage](storage: TStorage, useMQ: bool, minBQ: int):
 proc processMatches*[TSequence](self: Processor,
                    readStart: int, refStart: int64, length: int,
                    read: Record, reference: TSequence,
-                   nextevent: CigarElement, readQualityBuffer: TReadQualityBuffer) : void {.inline.} =
+                   nextevent: CigarElement) : void {.inline.} =
   ## Processes a matching substring between the read and the reference. All
   ## necessary information is available through the arguments. A matching
   ## substring consists of multiple contiguous matching bases.
@@ -275,7 +276,7 @@ proc processMatches*[TSequence](self: Processor,
 
 proc processInsertion*[TSequence](self: Processor,
                      readStart: int, refIndex: int64, length: int,
-                     read: Record, reference: TSequence, readQualityBuffer: TReadQualityBuffer): void {.inline.} =
+                     read: Record, reference: TSequence): void {.inline.} =
   ## Processes an insertion on the read (wrt. the reference). All necessary
   ## information is available through the arguments. An insertion consists of
   ## one or more bases found on the read, but not on the reference.
@@ -291,7 +292,7 @@ proc processInsertion*[TSequence](self: Processor,
 
 proc processDeletion*[TSequence](self: Processor,
                     readIndex: int, refStart: int64, length: int,
-                    read: Record, reference: TSequence, readQualityBuffer: TReadQualityBuffer): void {.inline.} =
+                    read: Record, reference: TSequence): void {.inline.} =
   ## Processes an deletion on the read (wrt. the reference). All necessary
   ## information is available through the arguments. A deletion consists of one
   ## or more bases found on the read, but not on the reference.
@@ -309,11 +310,12 @@ proc processDeletion*[TSequence](self: Processor,
                               read.flag.reverse)
 
 
-proc beginRead*(self: Processor, start: int64): void {.inline.} =
-  ## Performs what is necessary before starting a new read. In this case,
-  ## this means flushing the storage up to the starting position.
-  discard self.storage.flushUpTo(start)
-
+proc beginRead*(self: Processor, read: Record): void {.inline.} =
+  ## flush the storage up to the starting position.
+  discard self.storage.flushUpTo(read.start)
+  # buffer all read qualities for optimization (only parse qualities once)
+  self.readQualityBuffer = read.getReadQualityBuffer()
+     
 
 proc done*(self: Processor): void {.inline.} =
   ## Finishes the processing, flushes the entire storage.
