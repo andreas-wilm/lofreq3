@@ -9,7 +9,7 @@
 # standard
 import times
 import logging
-import strutils
+#import strutils
 import sequtils
 
 # third party

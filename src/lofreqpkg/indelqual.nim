@@ -113,12 +113,12 @@ proc getDindelQual(rec: Record, homopolymerRuns: seq[int]): (string, string) =
 
 proc parseIndelArg(arg: string): (char, char) =
   var args = split(arg, ",")
-  let iq = parseUInt(args[0])
-  var dq: uint
+  let iq = (uint8)parseUInt(args[0])# FIXME argh
+  var dq: uint8
   if len(args) == 1:
     dq = iq
   elif len(args) == 2:
-    dq = parseUInt(args[1])
+    dq = (uint8)parseUInt(args[1])# FIXME argh
   else:
     raise newException(ValueError,
       fmt"Couldn't find parse indel quality arg {arg}. Should be either indelq or insq,delq")
