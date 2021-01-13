@@ -57,10 +57,10 @@ As one step the above looks as follows:
     fq2=your-R2.fq.gz
     bwa mem $reffa  $fq1 $fq2 | \
       samtools fixmate - - | \
-      lofreq viterbi -f $reffa -i - | \
+      lofreq viterbi -f $reffa -b - | \
       samtools sort - | \
-      lofreq indelqual -f $reffa -i - | \
-      lofreq alnqual -f $reffa  -i - | \
+      lofreq indelqual -f $reffa -b - | \
+      lofreq alnqual -f $reffa  -b - | \
       samtools view -b - -o $obam;
 
 
