@@ -1,0 +1,42 @@
+Speed test after readQualityBuffer introduction (branch: pileup-buffer-tags)
+
+- lofreq-2.1.5: 100 secs on average
+- lofreq3 master 9081f4a: 300 secs on average
+- lofreq3 pileup-buffer-tags 82e2ee0: 200 secs on average
+
+Test set:
+- NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta
+- NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam
+
+- branch master: 9081f4a, called 3.0.0 below
+- branch pileup-buffer-tags:, 82e2ee0, called 3.0.1 below
+- conda installed lofreq-2.1.5
+
+
+	Command being timed: "lofreq call -f ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam -B -a 0.01 -b 1 --no-default-filter"
+	User time (seconds): 100.03
+	Maximum resident set size (kbytes): 6244
+	Command being timed: "/home/wilma/.nimble/pkgs/lofreq-3.0.0/lofreq call -f ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta -i ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam"
+	User time (seconds): 286.31
+	Maximum resident set size (kbytes): 9236
+	Command being timed: "/home/wilma/.nimble/pkgs/lofreq-3.0.1/lofreq call -f ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta -b ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam"
+	User time (seconds): 201.97
+	Maximum resident set size (kbytes): 9236
+	Command being timed: "lofreq call -f ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam -B -a 0.01 -b 1 --no-default-filter"
+	User time (seconds): 101.67
+	Maximum resident set size (kbytes): 6340
+	Command being timed: "/home/wilma/.nimble/pkgs/lofreq-3.0.0/lofreq call -f ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta -i ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam"
+	User time (seconds): 293.77
+	Maximum resident set size (kbytes): 9488
+	Command being timed: "/home/wilma/.nimble/pkgs/lofreq-3.0.1/lofreq call -f ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta -b ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam"
+	User time (seconds): 211.18
+	Maximum resident set size (kbytes): 9376
+	Command being timed: "lofreq call -f ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam -B -a 0.01 -b 1 --no-default-filter"
+	User time (seconds): 98.96
+	Maximum resident set size (kbytes): 6308
+	Command being timed: "/home/wilma/.nimble/pkgs/lofreq-3.0.0/lofreq call -f ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta -i ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam"
+	User time (seconds): 285.10
+	Maximum resident set size (kbytes): 9244
+	Command being timed: "/home/wilma/.nimble/pkgs/lofreq-3.0.1/lofreq call -f ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta -b ../lofreq3-testdata/NC_000912_Mpneumoniae/NC_000912_Mpneumoniae_comb.srt.idqdindel.bam"
+	User time (seconds): 201.84
+	Maximum resident set size (kbytes): 9380
