@@ -134,14 +134,12 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
       var
         readOffset = 0
         refOffset = int64(read.start)
-
       
-      # tell the processor that the new read is about to start
       processor.beginRead(read)
 
-      # process all events on the read
-      # unfortunately we need to know the next event to avoid
-      # storing indel quals twice, which makes this a bit ugly
+      # process all events on the read. unfortunately we need to know
+      # the next event to avoid storing indel quals twice, which makes
+      # this a bit ugly
       for idx in 0..<len(cigar):
         let event = cigar[idx]
         var nextevent: CigarElement

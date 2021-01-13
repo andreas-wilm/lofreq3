@@ -14,7 +14,7 @@ test -e $refbam
 testbam=${refbam%origviterbi.bam}.newviterbi.bam
 
 # run new viterbi
-../lofreq viterbi -f $fasta -i $inbam | samtools view -b -o $testbam
+../lofreq viterbi -f $fasta -b $inbam | samtools view -b -o $testbam
 # count differences compared to old viterbi, but ignore tags
 ndiff=$(diff <(samtools view $refbam | cut -f -11) \
     <(samtools view $testbam | cut -f -11) | grep -c '^>')

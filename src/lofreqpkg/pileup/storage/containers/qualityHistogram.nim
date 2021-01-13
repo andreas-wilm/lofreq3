@@ -75,8 +75,8 @@ proc `%`*[T](table: var QualityHistogram[T]): JsonNode {.inline.} =
 
   var buff = initOrderedTable[string, JsonNode]()
   for pair in table.pairs:
+    # pair[0] is the event, e.g. G or * or -
     buff[$pair[0]] = %pair[1]
-
   result.fields = buff
 
 
@@ -84,8 +84,11 @@ proc `%`*(table: CountTable[int]): JsonNode {.inline.} =
   result = newJObject()
 
   var buff = initOrderedTable[string, JsonNode]()
-  for pair in table.pairs:
+  # we are only sorting so that output is stable and can be used for testing
+  var srttable = deepCopy(table)
+  srttable.sort()
+  for pair in srttable.pairs:
+    # pair[0] is the quality
     buff[$pair[0]] = %pair[1]
-
   result.fields = buff
 
