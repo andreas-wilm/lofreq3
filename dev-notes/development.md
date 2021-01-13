@@ -1,15 +1,23 @@
 https://nvie.com/posts/a-successful-git-branching-model/
-he central repo holds two main branches with an infinite lifetime:
+the central repo holds two main branches with an infinite lifetime:
 
-master
-develop
+- master
+- develop
 
-When the source code in the develop branch reaches a stable point and is ready to be released, all of the changes should be merged back into master somehow and then tagged with a release number.
+When the source code in the develop branch reaches a stable point and is ready
+to be released, all of the changes should be merged back into master somehow
+and then tagged with a release number.
 
-Creating a feature branch 
+So master should always pass all tests
+
+## Creating a feature branch 
+
 When starting work on a new feature, branch off from the develop branch.
 
 $ git checkout -b myfeature develop
+
+When done merge into devel and run all tests (nimble tests and others)
+before merging into master (see above)
 
 
 ## Testing
