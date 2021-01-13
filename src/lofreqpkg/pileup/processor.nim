@@ -12,6 +12,7 @@
 ## - Author: Filip Sodic <filip.sodic@gmail.com>
 ## - License: The MIT License
 
+
 # standard library
 #import strutils
 # import logging
@@ -20,6 +21,7 @@
 import hts
 # project specific
 import ../utils
+
 
 #var logger = newConsoleLogger(fmtStr = verboseFmtStr, useStderr = true)
 
@@ -33,28 +35,24 @@ const BASE_ALN_QUAL_TAG = "BQ"# base alignment quality tag (BAQ)
 const INS_QUAL_TAG = "BI"# ins quality tag
 const DEL_QUAL_TAG = "BD"# del quality tag
 
-# minimum base quality. everything below will be recorded as -1.
-# this is later ignored/filtered by call(). 3 is default,
-# so that Illumina's Read Segment Quality Control Indicator" (#) gets ignored
-var minBQ* = 3
 
-## The expected type of procedures for calculating the qualities. All relevant
-## information should be obtainable through the record and the index.
-## NOTE: When dealing with a deletion or an insertion, the index is actually
-## the index of the base TO THE LEFT (the reference index of the last mutual
-## base.  Hovewer, this should not really make a difference since, in most
-## cases, all deletion and insertion quality data is found in the record's
-## custom fields.
-type TQualityProc = proc (r: Record, i: int, useMQ: bool): int
-
+# for optimization purposes to avoid having to parse/decode tags multiple times
+type TReadQualityBuffer* = object
+    mapQual: int# int because 255 as per BAM standard means NA. reflected here as high(int)
+    # might be of length zero of not present 
+    baseQuals: seq[uint8]# base qualities
+    baseAlnQuals: seq[uint8]# base alignment qualities
+    insQuals: seq[uint8]# insertion qualities
+    insAlnQuals: seq[uint8]# insertion alignment qualities
+    delQuals: seq[uint8]# deletion qualities
+    delAlnQuals: seq[uint8]# deletion alignment qualties
 
 type Processor[TStorage] = ref object
   ## The 'Processor' type. Its fields are configuration options.
   storage: TStorage
-  matchQualityAt: TQualityProc
-  deletionQualityAt: TQualityProc
-  insertionQualityAt: TQualityProc
+  readQualityBuffer: TReadQualityBuffer# of current read for optimization
   useMQ: bool
+  minBQ: int# minimum base quality. everything below will be recorded as -1.
 
 
 proc mergeQuals*(q_m: int, q_a: int, q_b: int): int =
@@ -68,99 +66,146 @@ proc mergeQuals*(q_m: int, q_a: int, q_b: int): int =
   let p_c = p_m + (1-p_m)*p_a + (1-p_m)*(1-p_a)*p_b
   prob2qual(p_c)
 
-
-proc insQualityAt(r: Record, i: int):  Natural =
+    
+# FIXME lots of repetition. use macro?
+proc insQualities(r: Record, q: var seq[uint8]): seq[uint8] =
+  q.set_len(0)
   let iq = tag[cstring](r, INS_QUAL_TAG)
-  if iq.isSome:
-    return decodeQual(iq.get[i])
-  else:
-    return high(int)
+  if iq.isSome:   
+    if len(q) != r.b.core.l_qseq:
+      q.set_len(r.b.core.l_qseq)
+    for i in 0..<int(r.b.core.l_qseq):
+      q[i] = decodeQual(iq.get[i])
+  return q
+ 
 
+# FIXME lots of repetition. use macro?
+proc delQualities(r: Record, q: var seq[uint8]): seq[uint8] =
+  q.set_len(0)
+  let dq = tag[cstring](r, DEL_QUAL_TAG)
+  if dq.isSome:
+    if len(q) != r.b.core.l_qseq:
+      q.set_len(r.b.core.l_qseq)
+    for i in 0..<int(r.b.core.l_qseq):
+      q[i] = decodeQual(dq.get[i])
+  return q
+ 
 
-proc delQualityAt(r: Record, i: int): Natural =
-    let dq = tag[cstring](r, DEL_QUAL_TAG)
-    if dq.isSome:
-      return decodeQual(dq.get[i])
-    else:
-      return high(int)
-
-
-proc baseAlnQualityAt(r: Record, i: int): Natural =
+# FIXME lots of repetition. use macro?
+proc baseAlnQualities(r: Record, q: var seq[uint8]): seq[uint8] =
+  q.set_len(0)
   let baq = tag[cstring](r, BASE_ALN_QUAL_TAG)
   if baq.isSome:
-    return decodeQual(baq.get[i])
-  else:
-    return high(int)
+    if len(q) != r.b.core.l_qseq:
+      q.set_len(r.b.core.l_qseq)
+    for i in 0..<int(r.b.core.l_qseq):
+      q[i] = decodeQual(baq.get[i])
+  return q
+ 
 
-
-proc insAlnQualityAt(r: Record, i: int): Natural =
+# FIXME lots of repetition. use macro?
+proc insAlnQualities(r: Record, q: var seq[uint8]): seq[uint8] =
+  q.set_len(0)
   let iaq = tag[cstring](r, INS_ALN_QUAL_TAG)
   if iaq.isSome:
-    return decodeQual(iaq.get[i])
-  else:
-    return high(int)
+    if len(q) != r.b.core.l_qseq:
+      q.set_len(r.b.core.l_qseq)
+    for i in 0..<int(r.b.core.l_qseq):
+      q[i] = decodeQual(iaq.get[i])
+  return q
 
 
-proc delAlnQualityAt(r: Record, i: int): Natural =
+# FIXME lots of repetition. use macro?
+proc delAlnQualities(r: Record, q: var seq[uint8]): seq[uint8] =
+  q.set_len(0)
   let daq = tag[cstring](r, DEL_ALN_QUAL_TAG)
   if daq.isSome:
-    return decodeQual(daq.get[i])
-  else:
-    return high(int)
+    if len(q) != r.b.core.l_qseq:
+      q.set_len(r.b.core.l_qseq)
+    for i in 0..<int(r.b.core.l_qseq):
+      q[i] = decodeQual(daq.get[i])
+  return q
 
 
-proc matchQual(r: Record, i: int, useMQ: bool): Natural =
-  var q_m = high(int)
-  let q_a = r.baseAlnQualityAt(i)
-  let q_b = int(r.baseQualityAt(i))
-  if useMQ:
-    q_m = int(r.mapping_quality)
+proc getReadQualityBuffer*(r: Record, useMQ: bool): TReadQualityBuffer =
+    result.baseQuals = newSeq[uint8]()# base qualities; already decoded
+    result.baseAlnQuals = newSeq[uint8]()# base alignment qualities
+    result.insQuals = newSeq[uint8]()# insertion qualities
+    result.insAlnQuals = newSeq[uint8]()# insertion alignment qualities
+    result.delQuals = newSeq[uint8]()# deletion qualities
+    result.delAlnQuals = newSeq[uint8]()# deletion alignment qualities
+
+    # FIXME report here if qualities are missing?
+    discard r.baseQualities(result.baseQuals)# from htsnim. see https://github.com/brentp/hts-nim/blob/13ccd2838a3d5e58991ff4cd50fe7ed41b434583/src/hts/bam.nim#L131
+    discard r.baseAlnQualities(result.baseAlnQuals)
+    discard r.insQualities(result.insQuals)
+    discard r.insAlnQualities(result.insAlnQuals)
+    discard r.delQualities(result.delQuals)
+    discard r.delAlnQualities(result.delAlnQuals)
+
+    result.mapQual = high(int)
+    if useMQ:
+      let mq = int(r.mapping_quality)
+      if mq != 255:# 255 means NA as per BAM standard
+        result.mapQual = mq
+
+
+proc matchQualityAt(self: Processor, i: int): Natural =
+  let q_b = int(self.readQualityBuffer.baseQuals[i])# from htsnim, always present as per BAM standard. FIXME 255==NA possible?
+  var q_a = high(int)
+  let q_m = self.readQualityBuffer.mapQual
+  if self.readQualityBuffer.baseAlnQuals.len > 0:
+    q_a = int(self.readQualityBuffer.baseAlnQuals[i])
   mergeQuals(q_m, q_a, q_b)
 
 
-proc insQual(r: Record, i: int, useMQ: bool): Natural =
-  var q_m = high(int)
-  let q_a = r.insAlnQualityAt(i)
-  let q_i = r.insQualityAt(i)
-  if useMQ:
-    q_m = int(r.mapping_quality)
+proc insertionQualityAt(self: Processor, i: int): Natural =
+  var q_i = high(int)
+  var q_a = high(int)
+  let q_m = self.readQualityBuffer.mapQual
+  if self.readQualityBuffer.insQuals.len > 0:
+    q_i = int(self.readQualityBuffer.insQuals[i])
+  if self.readQualityBuffer.insAlnQuals.len > 0:
+    q_a = int(self.readQualityBuffer.insAlnQuals[i])
   mergeQuals(q_m, q_a, q_i)
 
 
-proc delQual(r: Record, i: int, useMQ: bool): Natural =
-  var q_m = high(int)
-  let q_a = r.delAlnQualityAt(i)
-  let q_d = r.delQualityAt(i)
-  if useMQ:
-    q_m = int(r.mapping_quality)
+proc deletionQualityAt(self: Processor, i: int): Natural =
+  var q_d = high(int)
+  var q_a = high(int)
+  let q_m = self.readQualityBuffer.mapQual
+  if self.readQualityBuffer.delQuals.len > 0:
+    q_d = int(self.readQualityBuffer.delQuals[i])
+  if self.readQualityBuffer.delAlnQuals.len > 0:
+    q_a = int(self.readQualityBuffer.delAlnQuals[i])
   mergeQuals(q_m, q_a, q_d)
+  
 
-
-proc newProcessor*[TStorage](storage: TStorage, useMQ: bool):
-
+proc newProcessor*[TStorage](storage: TStorage, useMQ: bool, minBQ: int):
+  # minBQ = minimum base quality. everything below will be recorded as -1.
+  # is later ignored/filtered by call(). 3 is default,
+  # so that Illumina's Read Segment Quality Control Indicator" (#) gets ignored
   Processor[TStorage] {.inline.} =
-  ## The default constructor for the 'Processor' type.
-  Processor[TStorage](storage: storage,
-                      matchQualityAt: matchQual,
-                      insertionQualityAt: insQual,
-                      deletionQualityAt: delQual,
+    Processor[TStorage](storage: storage,
+                      minBQ: minBQ,
                       useMQ: useMQ)
+                      # readQualityBuffer unset for now and updated per read
 
 
 proc processMatches*[TSequence](self: Processor,
                    readStart: int, refStart: int64, length: int,
                    read: Record, reference: TSequence,
-                   nextevent: CigarElement, minBQ: int) : void {.inline.} =
+                   nextevent: CigarElement) : void {.inline.} =
   ## Processes a matching substring between the read and the reference. All
   ## necessary information is available through the arguments. A matching
   ## substring consists of multiple contiguous matching bases.
   for offset in countUp(0, length - 1):
     let refOff = int(refStart + offset)# FIXME stupid
     let readOff = readStart + offset
-    let bq = int(read.baseQualityAt(readOff))
-    if bq >= minBQ:
+    let bq = int(read.baseQualityAt(readOff))# FIXME use readQualityBuffer
+    if bq >= self.minBQ:
       self.storage.recordMatch(refOff, $read.baseAt(readOff),
-                                self.matchQualityAt(read, readOff, self.useMQ),
+                                self.matchQualityAt(readOff),
                                 read.flag.reverse,
                                 reference.baseAt(refOff))
     else:
@@ -172,18 +217,18 @@ proc processMatches*[TSequence](self: Processor,
     # Just be careful to not count twice (hence check next op if at the end)
     if offset < length-1:
         self.storage.recordInsertion(refOff, $refSymbolAtIndel(read.flag.reverse),
-          self.insertionQualityAt(read, readOff, self.useMQ),
+          self.insertionQualityAt(readOff),
           read.flag.reverse)
         self.storage.recordDeletion(refOff, $refSymbolAtIndel(read.flag.reverse),
-          self.deletionQualityAt(read, readOff, self.useMQ),
+          self.deletionQualityAt(readOff),
           read.flag.reverse)
     elif nextevent.op == CigarOp.insert:
       self.storage.recordDeletion(refOff, $refSymbolAtIndel(read.flag.reverse),
-        self.deletionQualityAt(read, readOff, self.useMQ),
+        self.deletionQualityAt(readOff),
         read.flag.reverse)
     elif nextevent.op == CigarOp.deletion:
       self.storage.recordInsertion(refOff, $refSymbolAtIndel(read.flag.reverse),
-        self.insertionQualityAt(read, readOff, self.useMQ),
+        self.insertionQualityAt(readOff),
         read.flag.reverse)
 
 
@@ -199,7 +244,7 @@ proc processInsertion*[TSequence](self: Processor,
 
   # insertion is reported on the base that preceeds it
   self.storage.recordInsertion(refIndex - 1, value,
-                               self.insertionQualityAt(read, readStart, self.useMQ),
+                               self.insertionQualityAt(readStart),
                                read.flag.reverse)
 
 
@@ -219,15 +264,16 @@ proc processDeletion*[TSequence](self: Processor,
 
   # deletion is reported on the base that preceeds it
   self.storage.recordDeletion(refStart - 1, value,
-                              self.deletionQualityAt(read, readIndex, self.useMQ),
+                              self.deletionQualityAt(readIndex),
                               read.flag.reverse)
 
 
-proc beginRead*(self: Processor, start: int64): void {.inline.} =
-  ## Performs what is necessary before starting a new read. In this case,
-  ## this means flushing the storage up to the starting position.
-  discard self.storage.flushUpTo(start)
-
+proc beginRead*(self: Processor, read: Record): void {.inline.} =
+  ## flush the storage up to the starting position.
+  discard self.storage.flushUpTo(read.start)
+  # buffer all read qualities for optimization (only parse qualities once)
+  self.readQualityBuffer = read.getReadQualityBuffer(self.useMQ)
+     
 
 proc done*(self: Processor): void {.inline.} =
   ## Finishes the processing, flushes the entire storage.

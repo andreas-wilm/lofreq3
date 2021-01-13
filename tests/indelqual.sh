@@ -12,7 +12,7 @@ fasta=NC_000912_Mpneumoniae/NC_000912_Mpneumoniae.fasta
 refbam=NC_000912_Mpneumoniae/indelqual/NC_000912_Mpneumoniae_comb.srt.indelonly.origindelqual-uni3040.bam
 test -e $refbam
 testbam=${refbam%origindelqual-uni3040.bam}newindelqual-uni3040.bam
-../lofreq indelqual -f $fasta -i $inbam -u 30,40 | samtools view -b -o $testbam
+../lofreq indelqual -f $fasta -b $inbam -u 30,40 | samtools view -b -o $testbam
 set +e
 diff -q <(samtools view $refbam) <(samtools view $testbam)
 if [ $? -ne 0 ]; then
@@ -28,7 +28,7 @@ rm $testbam
 refbam=NC_000912_Mpneumoniae/indelqual/NC_000912_Mpneumoniae_comb.srt.indelonly.origindelqual-dindel.bam
 test -e $refbam
 testbam=${refbam%origindelqual-dindel.bam}indelonly.newindelqual-dindel.bam
-../lofreq indelqual -f $fasta -i $inbam | samtools view -b -o $testbam
+../lofreq indelqual -f $fasta -b $inbam | samtools view -b -o $testbam
 set +e
 diff -q <(samtools view $refbam) <(samtools view $testbam)
 if [ $? -ne 0 ]; then

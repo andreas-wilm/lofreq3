@@ -23,11 +23,11 @@ proc refSymbolAtIndel*(reverse: bool): char =# evil hack to support strand for "
     REF_SYMBOL_AT_INDEL_FW
 
 
-proc decodeQual*(encqual: char, offset: uint = 33): uint =
-  return uint(ord(encqual))-offset
+proc decodeQual*(encqual: char, offset: uint8 = 33): uint8 =
+  return uint8(ord(encqual))-offset
 
 
-proc encodeQual*(qual: uint, offset: uint = 33): char =
+proc encodeQual*(qual: uint8, offset: uint8 = 33): char =
   assert qual+offset < 255
   result = chr(qual+offset)
 

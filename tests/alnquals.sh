@@ -20,21 +20,21 @@ test -e $refbam
 testbam=${refbam%alnqual.bam}.newAlnqual.bam
 
 # run new alnqual
-../lofreq alnqual -f $fasta -i $inbam | samtools view -b -o $testbam
+../lofreq alnqual -f $fasta -b $inbam | samtools view -b -o $testbam
 
-ndiff=$(diff <(../lofreq alnqual -f $fasta -i $inbam | grep -Pow 'ai:Z:.*[^\t]' | cut -f 1) <(samtools view $refbam | grep -Pow 'ai:Z:.*[^\t]' | cut -f 1) | grep -c '^>')
+ndiff=$(diff <(../lofreq alnqual -f $fasta -b $inbam | grep -Pow 'ai:Z:.*[^\t]' | cut -f 1) <(samtools view $refbam | grep -Pow 'ai:Z:.*[^\t]' | cut -f 1) | grep -c '^>')
 if [ $ndiff -gt 0 ]; then
     echo "FAIL: old and new alnqual AI implementations differ"
     exit 1
 fi
 
-ndiff=$(diff <(../lofreq alnqual -f $fasta -i $inbam | grep -Pow 'ad:Z:.*[^\t]' | cut -f 1) <(samtools view $refbam | grep -Pow 'ad:Z:.*[^\t]' | cut -f 1) | grep -c '^>')
+ndiff=$(diff <(../lofreq alnqual -f $fasta -b $inbam | grep -Pow 'ad:Z:.*[^\t]' | cut -f 1) <(samtools view $refbam | grep -Pow 'ad:Z:.*[^\t]' | cut -f 1) | grep -c '^>')
 if [ $ndiff -gt 0 ]; then
     echo "FAIL: old and new alnqual AD implementations differ"
     exit 1
 fi
 
-ndiff=$(diff <(../lofreq alnqual -f $fasta -i $inbam | grep -Pow 'lb:Z:.*[^\t]' | cut -f 1) <(samtools view $refbam | grep -Pow 'lb:Z:.*[^\t]' | cut -f 1) | grep -c '^>')
+ndiff=$(diff <(../lofreq alnqual -f $fasta -b $inbam | grep -Pow 'lb:Z:.*[^\t]' | cut -f 1) <(samtools view $refbam | grep -Pow 'lb:Z:.*[^\t]' | cut -f 1) | grep -c '^>')
 if [ $ndiff -gt 0 ]; then
     echo "FAIL: old and new alnqual BAQ implementations differ"
     exit 1

@@ -55,7 +55,7 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
                   nextevent: CigarElement,
                   processor: var TProcessor,
                   read: Record, reference: TSequence,
-                  readOffset: int, refOffset: int64, minBQ: int): (int, int64) {.inline.} =
+                  readOffset: int, refOffset: int64): (int, int64) {.inline.} =
   ## Processes one event (cigar element) on the read and returns the updated
   ## offset. The event is described by the first argument, 'event'.
   ## The parameter 'processor' provides a reference to the processor used to
@@ -77,7 +77,7 @@ proc processEvent[TSequence, TProcessor](event: CigarElement,
   if consumes.query and consumes.reference:
     # mutual, process all matches
     processor.processMatches(readOffset, refOffset, event.len,
-      read, reference, nextevent, minBQ)
+      read, reference, nextevent)
     return (readOffset + event.len, refOffset + event.len)
 
   elif consumes.reference:# also true for 'N'
@@ -117,31 +117,29 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
   var reference: ISequence# our own type, hence using loadSequence below
   var storage = newSlidingDeque(records.chromosomeName, region, handler,
     plpParams.mincov, plpParams.maxcov)
-  var processor = newProcessor(storage, plpParams.useMQ)
-
+  var processor = newProcessor(storage, plpParams.useMQ, plpParams.minBQ)
+  
   for read in records:
+      let cigar = read.cigar
+      if not cigar.valid:
+        # Skipping all invalid reads
+        logger.log(lvlWarn, "Skipping read with invalid CIGAR: " & $read)
+        continue
+      
       # all records come from the same chromosome as guaranteed by RecordFilter
       # load reference only after we're sure there's data to process
       if reference.len == 0:
         reference = fai.loadSequence(records.chromosomeName)
 
-      let cigar = read.cigar
-
-      if not cigar.valid:
-        # Skipping all invalid reads
-        logger.log(lvlWarn, "Skipping read with invalid CIGAR: " & $read)
-        continue
-
       var
         readOffset = 0
         refOffset = int64(read.start)
+      
+      processor.beginRead(read)
 
-      # tell the processor that the new read is about to start
-      processor.beginRead(read.start)
-
-      # process all events on the read
-      # unfortunately we need to know the next event to avoid
-      # storing indel quals twice, which makes this a bit ugly
+      # process all events on the read. unfortunately we need to know
+      # the next event to avoid storing indel quals twice, which makes
+      # this a bit ugly
       for idx in 0..<len(cigar):
         let event = cigar[idx]
         var nextevent: CigarElement
@@ -149,7 +147,7 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
         if idx+1 < len(cigar):
           nextevent = cigar[idx+1]
         (readOffset, refOffset) = processEvent(event, nextevent,
-          processor, read, reference, readOffset, refOffset, plpParams.minBQ)
+          processor, read, reference, readOffset, refOffset)
 
   # inform the processor that the pileup is done
   processor.done()

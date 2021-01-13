@@ -28,7 +28,7 @@ suite "alignment qualities (baq, ai, ad)":
     var tmpname: string
     (tmpfd, tmpname) = mkstemp()
     tmpfd.close
-    let cmd = fmt"{lofreq} alnqual -f {fa} -i {bam} > {tmpname}"
+    let cmd = fmt"{lofreq} alnqual -f {fa} -b {bam} > {tmpname}"
     echo "Testing: " & cmd
     let outp = execProcess(cmd)
 

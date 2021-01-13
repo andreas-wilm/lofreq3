@@ -3,8 +3,10 @@
 ## - Author: Andreas Wilm <andreas.wilm@gmail.com>
 ## - License: The MIT License
 
+
 {.compile: "viterbi.c".}
 {.passL: "-lm"}
+
 
 # standard
 import strutils
@@ -16,6 +18,7 @@ import algorithm
 import hts
 
 # project specific
+import utils
 
 
 # returns shift
