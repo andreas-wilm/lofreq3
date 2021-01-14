@@ -66,65 +66,16 @@ proc mergeQuals*(q_m: int, q_a: int, q_b: int): int =
   let p_c = p_m + (1-p_m)*p_a + (1-p_m)*(1-p_a)*p_b
   prob2qual(p_c)
 
-    
-# FIXME lots of repetition. use macro?
-proc insQualities(r: Record, q: var seq[uint8]): seq[uint8] =
-  q.set_len(0)
-  let iq = tag[cstring](r, INS_QUAL_TAG)
-  if iq.isSome:   
-    if len(q) != r.b.core.l_qseq:
-      q.set_len(r.b.core.l_qseq)
-    for i in 0..<int(r.b.core.l_qseq):
-      q[i] = decodeQual(iq.get[i])
-  return q
- 
 
-# FIXME lots of repetition. use macro?
-proc delQualities(r: Record, q: var seq[uint8]): seq[uint8] =
-  q.set_len(0)
-  let dq = tag[cstring](r, DEL_QUAL_TAG)
-  if dq.isSome:
-    if len(q) != r.b.core.l_qseq:
-      q.set_len(r.b.core.l_qseq)
+proc getQualities(r: Record, quals: var seq[uint8], bamTag: string): seq[uint8] =
+  quals.set_len(0)
+  let qualsEnc = tag[cstring](r, bamTag)
+  if qualsEnc.isSome:   
+    if len(quals) != r.b.core.l_qseq:
+      quals.set_len(r.b.core.l_qseq)
     for i in 0..<int(r.b.core.l_qseq):
-      q[i] = decodeQual(dq.get[i])
-  return q
- 
-
-# FIXME lots of repetition. use macro?
-proc baseAlnQualities(r: Record, q: var seq[uint8]): seq[uint8] =
-  q.set_len(0)
-  let baq = tag[cstring](r, BASE_ALN_QUAL_TAG)
-  if baq.isSome:
-    if len(q) != r.b.core.l_qseq:
-      q.set_len(r.b.core.l_qseq)
-    for i in 0..<int(r.b.core.l_qseq):
-      q[i] = decodeQual(baq.get[i])
-  return q
- 
-
-# FIXME lots of repetition. use macro?
-proc insAlnQualities(r: Record, q: var seq[uint8]): seq[uint8] =
-  q.set_len(0)
-  let iaq = tag[cstring](r, INS_ALN_QUAL_TAG)
-  if iaq.isSome:
-    if len(q) != r.b.core.l_qseq:
-      q.set_len(r.b.core.l_qseq)
-    for i in 0..<int(r.b.core.l_qseq):
-      q[i] = decodeQual(iaq.get[i])
-  return q
-
-
-# FIXME lots of repetition. use macro?
-proc delAlnQualities(r: Record, q: var seq[uint8]): seq[uint8] =
-  q.set_len(0)
-  let daq = tag[cstring](r, DEL_ALN_QUAL_TAG)
-  if daq.isSome:
-    if len(q) != r.b.core.l_qseq:
-      q.set_len(r.b.core.l_qseq)
-    for i in 0..<int(r.b.core.l_qseq):
-      q[i] = decodeQual(daq.get[i])
-  return q
+      quals[i] = decodeQual(qualsEnc.get[i])
+  return quals
 
 
 proc getReadQualityBuffer*(r: Record, useMQ: bool): TReadQualityBuffer =
@@ -137,11 +88,11 @@ proc getReadQualityBuffer*(r: Record, useMQ: bool): TReadQualityBuffer =
 
     # FIXME report here if qualities are missing?
     discard r.baseQualities(result.baseQuals)# from htsnim. see https://github.com/brentp/hts-nim/blob/13ccd2838a3d5e58991ff4cd50fe7ed41b434583/src/hts/bam.nim#L131
-    discard r.baseAlnQualities(result.baseAlnQuals)
-    discard r.insQualities(result.insQuals)
-    discard r.insAlnQualities(result.insAlnQuals)
-    discard r.delQualities(result.delQuals)
-    discard r.delAlnQualities(result.delAlnQuals)
+    discard r.getQualities(result.baseAlnQuals, BASE_ALN_QUAL_TAG)
+    discard r.getQualities(result.insQuals, INS_QUAL_TAG)
+    discard r.getQualities(result.insAlnQuals, INS_ALN_QUAL_TAG)
+    discard r.getQualities(result.delQuals, DEL_QUAL_TAG)
+    discard r.getQualities(result.delAlnQuals, DEL_ALN_QUAL_TAG)
 
     result.mapQual = high(int)
     if useMQ:
@@ -151,7 +102,7 @@ proc getReadQualityBuffer*(r: Record, useMQ: bool): TReadQualityBuffer =
 
 
 proc matchQualityAt(self: Processor, i: int): Natural =
-  let q_b = int(self.readQualityBuffer.baseQuals[i])# from htsnim, always present as per BAM standard. FIXME 255==NA possible?
+  let q_b = int(self.readQualityBuffer.baseQuals[i])# from htsnim, always present as per BAM standard.
   var q_a = high(int)
   let q_m = self.readQualityBuffer.mapQual
   if self.readQualityBuffer.baseAlnQuals.len > 0:
@@ -202,7 +153,7 @@ proc processMatches*[TSequence](self: Processor,
   for offset in countUp(0, length - 1):
     let refOff = int(refStart + offset)# FIXME stupid
     let readOff = readStart + offset
-    let bq = int(read.baseQualityAt(readOff))# FIXME use readQualityBuffer
+    let bq = int(self.readQualityBuffer.baseQuals[readOff])
     if bq >= self.minBQ:
       self.storage.recordMatch(refOff, $read.baseAt(readOff),
                                 self.matchQualityAt(readOff),
