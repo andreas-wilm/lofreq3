@@ -177,21 +177,3 @@ Easiest way is to install htslib is to use [bioconda](https://bioconda.github.io
 Installation of other dependencies is taking care of by Nimble.
 
 
-## To Do List
-
-In order of importance
-
-- Testing: end to end testing (and comparison to old LoFreq) on spike-in and real data and publish as notebook
-- Testing: mincov and maxcov filter (coverage() function) in the presence of indels
-- Testing: add unit tests for SB,DP,DP4 vs LoFreq2
-- Docs: Add installation notes
-- Docs: Add docs on filtering (bcftools recipes)
-- Release: tag version and provide binary compiled with hts_nim_static_builder
-- Testing: Add CI on Github
-- Docs: Add FAQ
-- Release: Create roadmap
-- Performance: Rewrite pileup
-- Performance: Parallelism: reader queue with async calling (sidestepping json conversion)
-- Performance: Pileup slow on nanopore data: even without printing json, dequeue initial size 100000 and release mode
-- Performance: write BAM with htsnim instead of SAM/string
-
