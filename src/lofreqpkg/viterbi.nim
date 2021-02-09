@@ -18,6 +18,7 @@ import algorithm
 import hts
 
 # project specific
+# utils needed for testing only
 import utils
 
 
@@ -55,7 +56,7 @@ proc getRefContext(rec: Record, refSq: string, refPadding: int, numIndels: int):
     s = 0
   var e = rec.stop + refPadding + numIndels
   if e >= len(refSq):
-    e = len(refSq)
+    e = len(refSq)-1
   result = toUpperAscii(refSq[s..e])#toupper to avoid ref masking
 
 
@@ -340,3 +341,4 @@ when isMainModule:
     doAssert alnseq == "MMDDMMMM"
 
   echo "OK: all tests passed"
+
