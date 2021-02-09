@@ -58,12 +58,12 @@
 #define BAM_FUNMAP         4
 
 /*! @abstract Table for converting a nucleotide character to the 4-bit encoding. */
-extern const unsigned char seq_nt16_table[256];
+/*extern const unsigned char seq_nt16_table[256];*/
 
 /*! @abstract Table for converting a 4-bit encoded nucleotide to a letter. */
-extern const char seq_nt16_str[];
+/*extern const char seq_nt16_str[];*/
 
-const unsigned char seq_nt16_table[256] = {
+static const unsigned char seq_nt16_table[256] = {
     15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
     15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
     15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
@@ -83,9 +83,9 @@ const unsigned char seq_nt16_table[256] = {
     15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15
 };
 
-const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
+static const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 
-const int seq_nt16_int[] = { 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 };
+static const int seq_nt16_int[] = { 4, 0, 1, 4, 2, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4 };
 
 #define bam_seqi(s, i) ((s)[(i)>>1] >> ((~(i)&1)<<2) & 0xf)
 
