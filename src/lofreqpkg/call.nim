@@ -222,6 +222,9 @@ proc callAtPos*(plp: PositionData): seq[Variant] =
   var baseCounts: CountTable[string]
   var baseCountsStranded: CountTable[string]
 
+  if plp.refBase notin "ACGT":
+    return
+
   for vartype in low(VarType)..high(VarType):
     # FIXME there got to be an easier way to do this
     if vartype == snp:
