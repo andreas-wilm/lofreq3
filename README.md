@@ -68,6 +68,11 @@ Then, use `lofreq call` to call variants in the processed BAM file. The followin
 
     lofreq call -b aln.bam -f ref.fa -r chr:s-e
 
+Ideally you immediately convert the output to compressed vcf and index the file:
+
+    lofreq call -b aln.bam -f ref.fa -r chr:s-e | bgzip > out.vcf.gz
+    tabix out.vcf.gz
+
 Finally filter variants on base quality and for example strand-bias as needed with `bcftools`.
 
 Use  `lofreq help` or `lofreq cmd --help` to display usage information, parameters etc.
@@ -143,9 +148,34 @@ Unless your samples were highly PCR amplified, we suggest to filter on strand bi
 
 ### Postprocessing of variants
 
+Our recommendation is to filter on quality, coverage, strand bias and possibly allele frequency.
 
-- **TODO**: bcftools command
-- **TODO**: explain strand bias
+LoFreq's quality is a phred-scaled error probabilty that the reported variant was predicted wrongly.
+A quality of 20 therefore means, that there is 1% chance of error, 30 means 0.1%
+etc. The more positions you test, the more likely you are to come
+across false positives. Therefore you might want to apply multiple testing correction. For this you could take
+the initial signifiance threshold of 0.05, divide it by the genome length (see also the fai index file of your reference sequence) and convert the resulting value into a
+phred quality score. A good rule of thumb is to use a value of 60 for bacteria and a value of 90 for
+a human-exome sized genome.
+
+High strand-bias is usually a sign of false positive variants. Note that strand bias is not the imbalance
+between base counts on forward and reverse strand, but the imbalance between ref and alt base counts on
+forward and reverse strand. High strand-bias happens especially in highly PCRed data and even
+more so in vicinity of primer sites.
+
+Allele frequency filtering is by right not necessary, but a minimal value of 0.5% is a good default,
+because LoFreq's resolution was experimentally tested up to that value.
+
+A good multipurpose filter command is the following:
+
+     bcftools filter -i 'QUAL>=60 && DP>=10 && SB<30 && AF>=0.005' in.vcf.gz -o out.vcf.gz
+
+This only keeps variants with
+
+- quality higher or equal 60
+- coverage higher or qqual 10
+- strand bias lower than 30
+- allele frequency higher or equal than 0.5%
 
 
 ## Installation

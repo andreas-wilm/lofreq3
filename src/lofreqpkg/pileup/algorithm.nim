@@ -118,14 +118,14 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
   var storage = newSlidingDeque(records.chromosomeName, region, handler,
     plpParams.mincov, plpParams.maxcov)
   var processor = newProcessor(storage, plpParams.useMQ, plpParams.minBQ)
-  
+
   for read in records:
       let cigar = read.cigar
       if not cigar.valid:
         # Skipping all invalid reads
         logger.log(lvlWarn, "Skipping read with invalid CIGAR: " & $read)
         continue
-      
+
       # all records come from the same chromosome as guaranteed by RecordFilter
       # load reference only after we're sure there's data to process
       if reference.len == 0:
@@ -134,7 +134,7 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
       var
         readOffset = 0
         refOffset = int64(read.start)
-      
+
       processor.beginRead(read)
 
       # process all events on the read. unfortunately we need to know

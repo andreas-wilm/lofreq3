@@ -52,7 +52,7 @@ proc fullPileup*(bamFname: string, faFname = "", regionsStr = "", bedFile = "",
     #quit("FIXME")
 
   if len(regionsStr) != 0 and len(bedFile) != 0:
-    quit("Can't read regions from bed and string at the same time")   
+    quit("Can't read regions from bed and string at the same time")
 
   var regions: seq[Region]
   if len(regionsStr) != 0:

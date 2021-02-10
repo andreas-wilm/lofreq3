@@ -27,9 +27,9 @@ const SUPPLEMENTARY*         = 2048
 
 
 ## All the flags which are ignored by default. If no flags are specified in the
-## constructor, use this. 
+## constructor, use this.
 const DEFAULT_IGNORE_FLAGS*: uint16 =
-  READ_UNMAPPED or 
+  READ_UNMAPPED or
   NOT_PRIMARY_ALIGNMENT or
   FAILS_VENDOR_CHECK or
   PCR_OR_DUPLICATE or
@@ -41,15 +41,15 @@ type RecordFilter* = ref object
   bam: Bam
   ignoreFlag: uint16
   chromosomeName*: string
-  startIdx*: int
+  startIdx*: int# zero based
   endIdx*: int
 
 
-proc newRecordFilter*(bam: Bam, chromosomeName: string, 
+proc newRecordFilter*(bam: Bam, chromosomeName: string,
                       startIdx: int, endIdx: int,
                       ignoreFlags: varargs[uint16]): RecordFilter =
   ## Constructs a new 'RecordFilter' object. The reads that are allowed through
-  ## the filter: 
+  ## the filter:
   ## 1. Belong to the provided chromosome
   ## 2. Are marked with non of the specified flags (if no flag is specified,
   ## the default is used)
@@ -60,7 +60,7 @@ proc newRecordFilter*(bam: Bam, chromosomeName: string,
   else:
     for flag in ignoreFlags:
       finalFlag = finalFlag or flag
-  
+
   return RecordFilter(bam: bam, chromosomeName: chromosomeName,
                       startIdx: startIdx, endIdx: endIdx,
                       ignoreFlag: finalFlag)
@@ -69,6 +69,6 @@ proc newRecordFilter*(bam: Bam, chromosomeName: string,
 iterator items*(self: RecordFilter) : Record =
   ## Enables transparent iteration in for..in loops. Makes any 'RecordFilter'
   ## object an iterable. This method should in most cases be called implicitly.
-  for read in self.bam.query(self.chromosomeName, int(self.startIdx), int(self.endIdx)):
+  for read in self.bam.query(self.chromosomeName, int(self.startIdx)+1, int(self.endIdx)):
     if (read.flag and self.ignoreFlag) == 0:
       yield read

@@ -22,7 +22,7 @@ import operationData
 type PositionData* = ref object
     ## The 'PositionData' object keeping all information concerning one parti-
     ## cular position on the reference.
-    refIndex*: int64
+    refIndex*: int64# one off-set
     refBase*: char
     chromosome*: string
     matches*: OperationData[string]# char would do, but string to make it consistent

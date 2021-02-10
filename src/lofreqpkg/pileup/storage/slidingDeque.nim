@@ -12,11 +12,9 @@
 # standard library
 import math
 import strutils
-#import strformat
 # project specific
 import deques
 import containers/positionData
-#import ../pipetools
 import ../../region
 
 
@@ -45,11 +43,12 @@ type SlidingDeque* = ref object
   mincov: Natural# FIXME feels wrong here
   maxcov: Natural# FIXME feels wrong here
 
+
 const DEFAULT_INITIAL_SIZE = 200# FIXME autoset from readlength?
 
 
 proc posWithinRegion(pos: PositionData, reg: Region): bool =
-  if pos.refIndex < reg.s or pos.refIndex > reg.e:
+  if pos.refIndex < reg.s+1 or pos.refIndex > reg.e:
     return false
   else:
     return true
