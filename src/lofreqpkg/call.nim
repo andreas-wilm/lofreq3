@@ -186,13 +186,13 @@ proc setVarInfo(af: float, coverage: int, refBase: char, altBase: string,
 
 
 proc getCountsAndEProbs[T](opData: T, vartype: VarType):
-  (seq[float], Natural, CountTable[string], CountTable[string]) =
+  (seq[float], CountTable[string], CountTable[string]) =
   # fill array of error probabilities, set baseCounts and baseCountsStranded.
   # note that base's strand is indicated by its case.
   var eProbs: seq[float] = @[]# base error probabilites
   var baseCounts = initCountTable[string]()# base counts
   var baseCountsStranded = initCountTable[string]()# strand aware counts
-  var coverage: Natural = 0
+  var coverage: Natural = 0# base coverage!
 
   for base, qhist in pairs(opData.histogram):
     var thisBaseCount = 0
@@ -212,13 +212,13 @@ proc getCountsAndEProbs[T](opData: T, vartype: VarType):
     baseCounts.inc($base.toUpperAscii, thisBaseCount)
     coverage += thisBaseCount
 
-  return (eProbs, coverage, baseCounts, baseCountsStranded)
+  return (eProbs, baseCounts, baseCountsStranded)
 
 
 ## result is a sequence, because we might return multiple variants for this position
 proc callAtPos*(plp: PositionData): seq[Variant] =
   var eprobs: seq[float]
-  var coverage: Natural
+  let coverage = coverage(plp)
   var baseCounts: CountTable[string]
   var baseCountsStranded: CountTable[string]
 
@@ -229,13 +229,13 @@ proc callAtPos*(plp: PositionData): seq[Variant] =
     # FIXME there got to be an easier way to do this
     if vartype == snp:
       plp.matches.clean()
-      (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.matches, snp)
+      (eprobs, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.matches, snp)
     elif vartype == ins:
       plp.insertions.clean()
-      (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.insertions, ins)
+      (eprobs, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.insertions, ins)
     elif vartype == del:
       plp.deletions.clean()
-      (eprobs, coverage, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.deletions, del)
+      (eprobs, baseCounts, baseCountsStranded) = getCountsAndEProbs(plp.deletions, del)
     else:
       raise newException(ValueError, "Illegal vartype" & $vartype)
 

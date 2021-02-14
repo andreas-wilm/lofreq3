@@ -96,6 +96,7 @@ proc submitDeq(self: SlidingDeque,
   # Submits the current deque for further processing
   for pd in deq:
     let cov = coverage(pd)
+
     if posWithinRegion(pd, self.region) and cov >= self.mincov and cov <= self.maxcov:# see also below
       self.submit(pd)
 
@@ -198,6 +199,7 @@ proc flushUpTo*(self: SlidingDeque, position: int64): int {.inline.} =
   while self.beginning < position:
     let pd = self.deq.popFirst()
     let cov = coverage(pd)
+
     if posWithinRegion(pd, self.region) and cov >= self.mincov and cov <= self.maxcov:# see also above
       self.submit(pd)
     self.beginning.inc

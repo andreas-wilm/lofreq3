@@ -31,7 +31,9 @@ type PositionData* = ref object
 
 
 proc coverage*(pd: PositionData): Natural =
-  coverage(pd.matches) + coverage(pd.deletions) + coverage(pd.insertions)
+  # this is read coverage. matches contain the necessary info including
+  # blank symbol
+  coverage(pd.matches)
 
 
 proc newPositionData*(refIndex: int64, refBase: char,
