@@ -14,3 +14,4 @@ tests/denv2-pseudoclonal
 tests/denv2-simulation
 tests/NC_000912_Mpneumoniae
 
+tests/calltest

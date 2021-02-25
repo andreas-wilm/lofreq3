@@ -69,6 +69,7 @@ proc newRecordFilter*(bam: Bam, chromosomeName: string,
 iterator items*(self: RecordFilter) : Record =
   ## Enables transparent iteration in for..in loops. Makes any 'RecordFilter'
   ## object an iterable. This method should in most cases be called implicitly.
-  for read in self.bam.query(self.chromosomeName, int(self.startIdx)+1, int(self.endIdx)):
+  #echo "FIXME self.bam.query(" & $self.startIdx & "," & $self.endIdx & ")"
+  for read in self.bam.query(self.chromosomeName, int(self.startIdx), int(self.endIdx)):
     if (read.flag and self.ignoreFlag) == 0:
       yield read

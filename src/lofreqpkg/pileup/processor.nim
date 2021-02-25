@@ -70,7 +70,7 @@ proc mergeQuals*(q_m: int, q_a: int, q_b: int): int =
 proc getQualities(r: Record, quals: var seq[uint8], bamTag: string): seq[uint8] =
   quals.set_len(0)
   let qualsEnc = tag[cstring](r, bamTag)
-  if qualsEnc.isSome:   
+  if qualsEnc.isSome:
     if len(quals) != r.b.core.l_qseq:
       quals.set_len(r.b.core.l_qseq)
     for i in 0..<int(r.b.core.l_qseq):
@@ -91,6 +91,8 @@ proc getReadQualityBuffer*(r: Record, useMQ: bool): TReadQualityBuffer =
     discard r.getQualities(result.baseAlnQuals, BASE_ALN_QUAL_TAG)
     discard r.getQualities(result.insQuals, INS_QUAL_TAG)
     discard r.getQualities(result.insAlnQuals, INS_ALN_QUAL_TAG)
+    #echo "FIXME " & r.qname & " with cigar " & $r.cigar & " insQuals=" & $result.insQuals
+    #echo "FIXME " & r.qname & " with cigar " & $r.cigar & " insAlnQuals=" & $result.insAlnQuals
     discard r.getQualities(result.delQuals, DEL_QUAL_TAG)
     discard r.getQualities(result.delAlnQuals, DEL_ALN_QUAL_TAG)
 
@@ -130,7 +132,7 @@ proc deletionQualityAt(self: Processor, i: int): Natural =
   if self.readQualityBuffer.delAlnQuals.len > 0:
     q_a = int(self.readQualityBuffer.delAlnQuals[i])
   mergeQuals(q_m, q_a, q_d)
-  
+
 
 proc newProcessor*[TStorage](storage: TStorage, useMQ: bool, minBQ: int):
   # minBQ = minimum base quality. everything below will be recorded as -1.
@@ -195,9 +197,10 @@ proc processInsertion*[TSequence](self: Processor,
 
   # insertion is reported on the base that preceeds it
   self.storage.recordInsertion(refIndex - 1, value,
-                               self.insertionQualityAt(readStart),
+                               self.insertionQualityAt(readStart-1),
                                read.flag.reverse)
 
+  #echo "FIXME recording insertion " & value & " at " & $readStart & " with " & $self.insertionQualityAt(readStart-1)
 
 proc processDeletion*[TSequence](self: Processor,
                     readIndex: int, refStart: int64, length: int,
@@ -215,16 +218,16 @@ proc processDeletion*[TSequence](self: Processor,
 
   # deletion is reported on the base that preceeds it
   self.storage.recordDeletion(refStart - 1, value,
-                              self.deletionQualityAt(readIndex),
+                              self.deletionQualityAt(readIndex-1),
                               read.flag.reverse)
-
+  #echo "FIXME recording deletion " & value & " at " & $readIndex & " with "  & $self.deletionQualityAt(readIndex-1)
 
 proc beginRead*(self: Processor, read: Record): void {.inline.} =
   ## flush the storage up to the starting position.
   discard self.storage.flushUpTo(read.start)
   # buffer all read qualities for optimization (only parse qualities once)
   self.readQualityBuffer = read.getReadQualityBuffer(self.useMQ)
-     
+
 
 proc done*(self: Processor): void {.inline.} =
   ## Finishes the processing, flushes the entire storage.

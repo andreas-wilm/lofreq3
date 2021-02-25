@@ -31,7 +31,7 @@ suite "call":
     var nvars = 0
     for rec in v:
         inc nvars
-        
+
     check nvars == 0
 
 
@@ -101,4 +101,25 @@ suite "call":
     (output, exitCode) = execCmdEx(diff_cmd)
     #echo "Diff command: " & diff_cmd
     check(exitCode == 0)
+
+  test "snp-and-indel-at-pos":
+    # testing #38 and 39
+    var tmpfd: File
+    var tmpname: string
+    (tmpfd, tmpname) = mkstemp()
+    tmpfd.close
+    let cmd = lofreq & " call -b call_samples/cov.bam -f call_samples/cov.fa -r simple:3-3 > " & tmpname
+    #echo "Testing: " & cmd
+    let outp = execProcess(cmd)
+    var v:VCF
+    discard open(v, tmpname)
+    var vartypes: seq[string]
+    for r in v:
+      var vt: string
+      check r.info.get("TYPE", vt) == Status.OK
+      vartypes.add(vt)
+
+    check len(vartypes) == 2
+    check "snp" in vartypes
+    check "ins" in vartypes
 

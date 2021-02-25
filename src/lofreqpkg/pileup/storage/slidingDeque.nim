@@ -49,6 +49,7 @@ const DEFAULT_INITIAL_SIZE = 200# FIXME autoset from readlength?
 
 proc posWithinRegion(pos: PositionData, reg: Region): bool =
   if pos.refIndex < reg.s+1 or pos.refIndex > reg.e:
+    #echo "FIXME pos.refIndex " & $pos.refIndex & "reg.s=" & $reg.s & "reg.e=" & $reg.e 
     return false
   else:
     return true

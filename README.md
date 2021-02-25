@@ -40,13 +40,16 @@ datasets. Nucleic Acids Res. 2012;
 ## For the impatient
 
 LoFreq is called through a single binary called `lofreq`. It's main purpose is to call variants from a preprocessed BAM file.
- 
+It's target platform is Illumina, but it does work with other sequencing data as well.
+
 You will achieve best variant calling results by following the following preprocessing steps for your reads:
 
 1. Align your reads with a mapper that produces mapping qualities, e.g. [BWA](http://bio-bwa.sourceforge.net/)
-1. Recommended: Realign the reads with indels with the base quality aware `lofreq viterbi`
+1. Recommended: Realign the reads with indels with the base quality aware `lofreq viterbi` (will be
+   slow for long read data)
 1. Sort the BAM file with `samtools sort` (`viterbi` will change the alignment position of some reads)
-1. Required for indel calling: Add indel qualities (previously also done in GATK's BQSR step) `lofreq indelqual`
+1. Required for indel calling: Add indel qualities (BI and BD tags) `lofreq indelqual`. Note: the
+   default (dindel qualities) is Illumina specific.
 1. Recommended: Add base- and indel alignment qualities ([BAQ](https://pubmed.ncbi.nlm.nih.gov/21320865/) and a LoFreq equivalent for indels) with `lofreq alnqual`
 
 As one step the above looks as follows:
@@ -166,7 +169,7 @@ more so in vicinity of primer sites.
 Allele frequency filtering is by right not necessary, but a minimal value of 0.5% is a good default,
 because LoFreq's resolution was experimentally tested up to that value.
 
-A good multipurpose filter command is the following:
+A good multi-purpose filter command is the following:
 
      bcftools filter -i 'QUAL>=60 && DP>=10 && SB<30 && AF>=0.005' in.vcf.gz -o out.vcf.gz
 
@@ -177,6 +180,8 @@ This only keeps variants with
 - strand bias lower than 30
 - allele frequency higher or equal than 0.5%
 
+There are other filters you might employ e.g. remove highly repetitive regions with
+[mdust](https://github.com/lh3/mdust).
 
 ## Installation
 

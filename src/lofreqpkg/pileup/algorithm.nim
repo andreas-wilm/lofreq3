@@ -120,6 +120,7 @@ proc pileup*(fai: Fai, records: RecordFilter, region: Region,
   var processor = newProcessor(storage, plpParams.useMQ, plpParams.minBQ)
 
   for read in records:
+      #echo "FIXME Got read" & $read
       let cigar = read.cigar
       if not cigar.valid:
         # Skipping all invalid reads
